@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Something Went Wrong{% endblock %}
+{% block body %}
+<div class="auth-shell">
+  <div class="auth-card text-center">
+    <div class="auth-logo">
+      <img src="{{ url_for('static', filename='images/final-mile-techies-logo.png') }}" alt="Final Mile Techies logo">
+    </div>
+    <div class="success-check" style="background: var(--color-error-soft); color: var(--color-error);">
+      <i class="ph ph-warning-octagon"></i>
+    </div>
+    <h1 class="h4">Something Went Wrong</h1>
+    <p class="text-muted-fmt">An unexpected error occurred on our end. Please try again in a moment.</p>
+    <a href="{{ url_for('auth.index') }}" class="btn-fmt btn-fmt-primary btn-fmt-block mt-3">
+      <i class="ph ph-house"></i> Back to Home
+    </a>
+  </div>
+</div>
+{% endblock %}

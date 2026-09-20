@@ -1,0 +1,97 @@
+{% extends "layout_admin.html" %}
+{% block title %}{{ 'Add Employee' if mode == 'add' else 'Edit Employee' }}{% endblock %}
+{% block page_title %}{{ 'Add Employee' if mode == 'add' else 'Edit Employee' }}{% endblock %}
+{% block page_subtitle %}<p>{{ 'Create a new employee account.' if mode == 'add' else 'Update employee profile information.' }}</p>{% endblock %}
+
+{% block page_content %}
+<div class="container-narrow">
+  <div class="card-fmt card-fmt-body">
+    <form method="post" data-lock-submit novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-group-fmt">
+        <label class="form-label-fmt" for="name">Employee Name<span class="required">*</span></label>
+        <input type="text" class="form-control-fmt" id="name" name="name" required
+               value="{{ (form.name if form else employee.name) or '' }}">
+      </div>
+
+      {% if mode == 'add' %}
+      <div class="form-group-fmt">
+        <label class="form-label-fmt" for="employee_id">Employee ID<span class="required">*</span></label>
+        <input type="text" class="form-control-fmt" id="employee_id" name="employee_id" placeholder="e.g. EMP001" required
+               value="{{ form.employee_id or '' }}" style="text-transform: uppercase;">
+        <p class="form-hint">This is permanent once created — it cannot be changed later.</p>
+      </div>
+      {% else %}
+      <div class="form-group-fmt">
+        <label class="form-label-fmt">Employee ID</label>
+        <div class="field-locked">
+          {{ employee.employee_id }}
+          <span class="lock-note"><i class="ph ph-lock-simple"></i> Fixed by Admin</span>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="row g-3">
+        <div class="col-12 col-sm-6">
+          <div class="form-group-fmt">
+            <label class="form-label-fmt" for="mobile">Mobile Number<span class="required">*</span></label>
+            <input type="tel" class="form-control-fmt" id="mobile" name="mobile" required
+                   value="{{ (form.mobile if form else employee.mobile) or '' }}">
+          </div>
+        </div>
+        <div class="col-12 col-sm-6">
+          <div class="form-group-fmt">
+            <label class="form-label-fmt" for="email">Email ID<span class="required">*</span></label>
+            <input type="email" class="form-control-fmt" id="email" name="email" required
+                   value="{{ (form.email if form else employee.email) or '' }}">
+          </div>
+        </div>
+      </div>
+
+      {% if mode == 'add' %}
+      <div class="row g-3">
+        <div class="col-12 col-sm-6">
+          <div class="form-group-fmt">
+            <label class="form-label-fmt" for="password">Password<span class="required">*</span></label>
+            <div class="password-field">
+              <input type="password" class="form-control-fmt" id="password" name="password" required minlength="6">
+              <button type="button" class="password-toggle" data-password-toggle="password" aria-label="Show password"><i class="ph ph-eye"></i></button>
+            </div>
+            <p class="form-hint">Minimum 6 characters.</p>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6">
+          <div class="form-group-fmt">
+            <label class="form-label-fmt" for="initial_balance">Initial Balance</label>
+            <div class="input-amount">
+              <span class="currency-prefix">₹</span>
+              <input type="number" class="form-control-fmt" id="initial_balance" name="initial_balance" min="0" step="0.01" placeholder="0.00"
+                     value="{{ form.initial_balance or '' }}">
+            </div>
+            <p class="form-hint">Optional — recorded as a money credit.</p>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="form-group-fmt">
+        <label class="form-label-fmt" for="status">Status</label>
+        <select class="form-select-fmt" id="status" name="status">
+          {% set current_status = (form.status if form else employee.status) or 'Active' %}
+          <option value="Active" {{ 'selected' if current_status == 'Active' }}>Active</option>
+          <option value="Inactive" {{ 'selected' if current_status == 'Inactive' }}>Inactive</option>
+        </select>
+      </div>
+
+      <div class="d-flex gap-2 mt-4 flex-wrap">
+        <button type="submit" class="btn-fmt btn-fmt-primary btn-fmt-lg">
+          <span class="btn-spinner"></span>
+          <span class="btn-label"><i class="ph ph-check"></i> {{ 'Create Employee' if mode == 'add' else 'Save Changes' }}</span>
+        </button>
+        <a href="{{ url_for('admin.employees') if mode == 'add' else url_for('admin.employee_detail', user_id=employee.id) }}" class="btn-fmt btn-fmt-outline btn-fmt-lg">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

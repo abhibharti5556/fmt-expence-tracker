@@ -1,0 +1,101 @@
+{% extends "layout_employee.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}My Expense Dashboard{% endblock %}
+{% block page_subtitle %}<p>Welcome back, {{ g.current_user.name.split(' ')[0] }}.</p>{% endblock %}
+
+{% block page_content %}
+
+<div class="quick-actions">
+  <a href="{{ url_for('employee.expense_logistics') }}" class="quick-action">
+    <span class="qa-icon"><i class="ph ph-truck"></i></span> Logistics Expense
+  </a>
+  <a href="{{ url_for('employee.expense_warehousing') }}" class="quick-action">
+    <span class="qa-icon"><i class="ph ph-warehouse"></i></span> Warehousing Expense
+  </a>
+  <a href="{{ url_for('employee.expenses') }}" class="quick-action">
+    <span class="qa-icon"><i class="ph ph-receipt"></i></span> View My Expenses
+  </a>
+  <a href="{{ url_for('employee.profile') }}" class="quick-action">
+    <span class="qa-icon"><i class="ph ph-user-circle"></i></span> My Profile
+  </a>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-12 col-lg-4">
+    <div class="balance-hero h-100">
+      <div class="balance-hero-label">Available Balance</div>
+      <div class="balance-hero-value">{{ totals.balance|inr }}</div>
+      <div class="balance-hero-row">
+        <div><span>Received</span><strong>{{ totals.received|inr }}</strong></div>
+        <div><span>Spent</span><strong>{{ totals.spent|inr }}</strong></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-8">
+    <div class="kpi-grid kpi-grid-flush">
+      {{ m.kpi_card('ph-truck', 'brand', 'Logistics', totals.logistics|inr) }}
+      {{ m.kpi_card('ph-warehouse', 'info', 'Warehousing', totals.warehousing|inr) }}
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-4">
+    <div class="card-fmt chart-card h-100">
+      <h2 class="h6 mb-3">My Spending</h2>
+      {% if totals.spent > 0 %}
+      <div class="chart-wrap sm">
+        <canvas id="mySpendChart" role="img" aria-label="Doughnut chart of logistics vs warehousing spending"></canvas>
+      </div>
+      {% else %}
+      {{ m.empty_state('ph-chart-pie-slice', 'No spending yet', 'Submit your first expense to see your spending breakdown.') }}
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-12 col-lg-8">
+    <div class="card-fmt">
+      <div class="card-fmt-header">
+        <h2>Recent Expenses</h2>
+        <a href="{{ url_for('employee.expenses') }}" class="btn-fmt btn-fmt-ghost btn-fmt-sm">View All Expenses <i class="ph ph-arrow-right"></i></a>
+      </div>
+      {% if recent_expenses %}
+      <div class="table-fmt-wrap">
+        <table class="table-fmt">
+          <thead><tr><th>Date</th><th>Type</th><th class="num">Amount</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for e in recent_expenses %}
+            <tr>
+              <td>{{ e.created_at.strftime('%d %b %Y') }}</td>
+              <td>{{ m.type_tag(e.expense_type) }}</td>
+              <td class="num mono">{{ e.amount|inr }}</td>
+              <td>{{ m.status_pill(e.payment_status) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      {{ m.empty_state('ph-receipt', 'No expenses yet', 'Your submitted expenses will appear here.', url_for('employee.expense_new'), 'New Expense') }}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+{% if totals.spent > 0 %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+  new Chart(document.getElementById('mySpendChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Logistics', 'Warehousing'],
+      datasets: [{ data: [{{ totals.logistics }}, {{ totals.warehousing }}], backgroundColor: ['#F2A61D', '#1B2130'], borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+  });
+</script>
+{% endif %}
+{% endblock %}

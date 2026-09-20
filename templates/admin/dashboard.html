@@ -1,0 +1,188 @@
+{% extends "layout_admin.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Final Mile Techies | Expense Dashboard{% endblock %}
+{% block page_subtitle %}<p>Here's what's happening across the company today.</p>{% endblock %}
+
+{% block page_content %}
+
+<div class="quick-actions">
+  <a href="{{ url_for('admin.add_employee') }}" class="quick-action">
+    <span class="qa-icon"><i class="ph ph-user-plus"></i></span> Add Employee
+  </a>
+  <a href="{{ url_for('admin.add_money') }}" class="quick-action">
+    <span class="qa-icon"><i class="ph ph-hand-coins"></i></span> Add Money
+  </a>
+  <a href="{{ url_for('admin.expenses') }}" class="quick-action">
+    <span class="qa-icon"><i class="ph ph-receipt"></i></span> View Expenses
+  </a>
+  <a href="{{ url_for('admin.reports') }}" class="quick-action">
+    <span class="qa-icon"><i class="ph ph-download-simple"></i></span> Download Report
+  </a>
+</div>
+
+{% import "partials/macros.html" as m %}
+
+<div class="kpi-grid">
+  {{ m.kpi_card('ph-hand-coins', 'brand', 'Total Money Distributed', kpis.total_distributed|inr) }}
+  {{ m.kpi_card('ph-receipt', 'navy', 'Total Expenses', kpis.total_expenses|inr) }}
+  {{ m.kpi_card('ph-truck', 'brand', 'Logistics Expenses', kpis.logistics_total|inr) }}
+  {{ m.kpi_card('ph-warehouse', 'info', 'Warehousing Expenses', kpis.warehousing_total|inr) }}
+  {{ m.kpi_card('ph-wallet', 'success', 'Available Employee Balance', kpis.available_balance|inr) }}
+  {{ m.kpi_card('ph-users', 'navy', 'Active Employees', kpis.active_employees) }}
+  {{ m.kpi_card('ph-arrows-left-right', 'info', 'Total Transactions', kpis.total_transactions) }}
+  {{ m.kpi_card('ph-calendar-check', 'warning', "Today's Expenses", kpis.today_expenses|inr) }}
+</div>
+
+<div class="row g-4 mb-1">
+  <div class="col-12 col-lg-8">
+    <div class="card-fmt chart-card h-100">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <h2 class="h6 mb-0">Daily Expense Trend</h2>
+        <span class="text-muted-fmt" style="font-size:0.8rem;">Last 14 days</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="dailyTrendChart" role="img" aria-label="Line chart of daily expenses over the last 14 days"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="card-fmt chart-card h-100">
+      <h2 class="h6 mb-3">Logistics vs Warehousing</h2>
+      <div class="chart-wrap sm">
+        <canvas id="typeSplitChart" role="img" aria-label="Doughnut chart comparing logistics and warehousing spend"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-6">
+    <div class="card-fmt chart-card h-100">
+      <h2 class="h6 mb-3">Employee-wise Spending</h2>
+      {% if employee_labels %}
+      <div class="chart-wrap">
+        <canvas id="employeeSpendChart" role="img" aria-label="Bar chart of top spending employees"></canvas>
+      </div>
+      {% else %}
+      {{ m.empty_state('ph-chart-bar', 'No spending yet', 'Employee spending will appear here once expenses are submitted.') }}
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card-fmt chart-card h-100">
+      <h2 class="h6 mb-3">Monthly Expense Trend</h2>
+      <div class="chart-wrap">
+        <canvas id="monthlyTrendChart" role="img" aria-label="Bar chart of monthly expense totals"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+  const FMT_BRAND = '#F2A61D';
+  const FMT_NAVY = '#1B2130';
+  const FMT_SUCCESS = '#1D8A5E';
+  const FMT_INFO = '#2563EB';
+  const FMT_GRID = '#E4E7EC';
+  const FMT_TEXT_MUTED = '#8A93A2';
+
+  Chart.defaults.font.family = "'Source Sans 3', sans-serif";
+  Chart.defaults.color = FMT_TEXT_MUTED;
+
+  new Chart(document.getElementById('dailyTrendChart'), {
+    type: 'line',
+    data: {
+      labels: {{ daily_labels|tojson }},
+      datasets: [{
+        label: 'Expenses',
+        data: {{ daily_values|tojson }},
+        borderColor: FMT_BRAND,
+        backgroundColor: 'rgba(242, 166, 29, 0.15)',
+        fill: true,
+        tension: 0.35,
+        pointRadius: 3,
+        pointBackgroundColor: FMT_BRAND,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: FMT_GRID }, ticks: { callback: (v) => '₹' + v.toLocaleString('en-IN') } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('typeSplitChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Logistics', 'Warehousing'],
+      datasets: [{
+        data: [{{ kpis.logistics_total }}, {{ kpis.warehousing_total }}],
+        backgroundColor: [FMT_BRAND, FMT_NAVY],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+
+  {% if employee_labels %}
+  new Chart(document.getElementById('employeeSpendChart'), {
+    type: 'bar',
+    data: {
+      labels: {{ employee_labels|tojson }},
+      datasets: [{
+        label: 'Total Spent',
+        data: {{ employee_values|tojson }},
+        backgroundColor: FMT_NAVY,
+        borderRadius: 6,
+        maxBarThickness: 34,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: FMT_GRID }, ticks: { callback: (v) => '₹' + v.toLocaleString('en-IN') } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+  {% endif %}
+
+  new Chart(document.getElementById('monthlyTrendChart'), {
+    type: 'bar',
+    data: {
+      labels: {{ monthly_labels|tojson }},
+      datasets: [{
+        label: 'Monthly Expenses',
+        data: {{ monthly_values|tojson }},
+        backgroundColor: FMT_INFO,
+        borderRadius: 6,
+        maxBarThickness: 40,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: FMT_GRID }, ticks: { callback: (v) => '₹' + v.toLocaleString('en-IN') } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+</script>
+{% endblock %}

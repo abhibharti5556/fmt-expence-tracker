@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="app-shell">
+  {% include "partials/sidebar_employee.html" %}
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button type="button" class="topbar-hamburger" data-sidebar-toggle aria-label="Toggle navigation menu">
+          <i class="ph ph-list"></i>
+        </button>
+        <div class="topbar-title">
+          <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+          {% block page_subtitle %}{% endblock %}
+        </div>
+      </div>
+      <div class="topbar-right">
+        {% if sidebar_balance is not none %}
+        <span class="balance-chip"><i class="ph ph-wallet"></i> {{ sidebar_balance|inr }}</span>
+        {% endif %}
+      </div>
+    </header>
+
+    <main class="page-content">
+      {% block page_content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends "layout_employee.html" %}
+{% import "partials/step_indicator.html" as si %}
+{% block title %}Warehousing Expense{% endblock %}
+{% block page_title %}Warehousing Expense{% endblock %}
+{% block page_subtitle %}<p>Fill in the details of your warehousing expense.</p>{% endblock %}
+
+{% block page_content %}
+<div class="container-medium">
+  {{ si.steps(1) }}
+
+  <div class="card-fmt card-fmt-body">
+    <form method="post" enctype="multipart/form-data" data-lock-submit novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <fieldset class="form-fieldset">
+        <legend><i class="ph ph-warehouse"></i> Warehousing Expense</legend>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="amount">Amount<span class="required">*</span></label>
+          <div class="input-amount">
+            <span class="currency-prefix">₹</span>
+            <input type="number" class="form-control-fmt" id="amount" name="amount" min="0.01" step="0.01" placeholder="0.00" required
+                   value="{{ form.amount or '' }}">
+          </div>
+          <p class="form-hint">Available balance: {{ balance|inr }}</p>
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="purpose">Purpose of Expense<span class="required">*</span></label>
+          <input type="text" class="form-control-fmt" id="purpose" name="purpose" required value="{{ form.purpose or '' }}"
+                 placeholder="e.g. Packaging material">
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="reason">Why is this Expense Required?<span class="required">*</span></label>
+          <textarea class="form-control-fmt" id="reason" name="reason" rows="2" required placeholder="e.g. Daily packing operations">{{ form.reason or '' }}</textarea>
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="approved_by">Approved By<span class="required">*</span></label>
+          <input type="text" class="form-control-fmt" id="approved_by" name="approved_by" required value="{{ form.approved_by or '' }}">
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="remarks">Remarks</label>
+          <textarea class="form-control-fmt" id="remarks" name="remarks" rows="2">{{ form.remarks or '' }}</textarea>
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="invoice">Invoice / Supporting Document<span class="required">*</span></label>
+          <div class="upload-dropzone">
+            <input type="file" id="invoice" name="invoice" accept=".pdf,.jpg,.jpeg,.png" data-preview-target="invoicePreview" required>
+            <i class="ph ph-upload-simple"></i>
+            <div class="upload-title">Tap to upload or drag a file here</div>
+            <div class="upload-hint">PDF, JPG, JPEG or PNG — max 10 MB</div>
+          </div>
+          <div class="upload-preview" id="invoicePreview">
+            <div class="file-thumb"></div>
+            <div class="file-meta">
+              <div class="file-name"></div>
+              <div class="file-size"></div>
+            </div>
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="form-actions-bar">
+        <button type="submit" class="btn-fmt btn-fmt-primary btn-fmt-lg">
+          <span class="btn-spinner"></span>
+          <span class="btn-label">Continue to Review <i class="ph ph-arrow-right"></i></span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

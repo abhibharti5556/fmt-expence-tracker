@@ -1,0 +1,86 @@
+{% extends "layout_admin.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}Add Money{% endblock %}
+{% block page_title %}Add Money{% endblock %}
+{% block page_subtitle %}<p>Credit balance to an employee for expenses.</p>{% endblock %}
+
+{% block page_content %}
+
+<div class="row g-4">
+  <div class="col-12 col-lg-5">
+    <div class="card-fmt card-fmt-body">
+      <form method="post" data-lock-submit novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="user_id">Select Employee<span class="required">*</span></label>
+          <select class="form-select-fmt" id="user_id" name="user_id" required>
+            <option value="">Choose an employee…</option>
+            {% for emp in employees %}
+            <option value="{{ emp.id }}" {{ 'selected' if preselect == emp.id }}>{{ emp.employee_id }} — {{ emp.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="amount">Amount<span class="required">*</span></label>
+          <div class="input-amount">
+            <span class="currency-prefix">₹</span>
+            <input type="number" class="form-control-fmt" id="amount" name="amount" min="0.01" step="0.01" placeholder="0.00" required>
+          </div>
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="purpose">Purpose<span class="required">*</span></label>
+          <input type="text" class="form-control-fmt" id="purpose" name="purpose" placeholder="e.g. Monthly Expense Advance" required>
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="remarks">Remarks</label>
+          <textarea class="form-control-fmt" id="remarks" name="remarks" rows="2" placeholder="Optional notes"></textarea>
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="date">Date</label>
+          <input type="date" class="form-control-fmt" id="date" name="date" value="{{ today }}" max="{{ today }}">
+        </div>
+
+        <button type="submit" class="btn-fmt btn-fmt-primary btn-fmt-lg btn-fmt-block">
+          <span class="btn-spinner"></span>
+          <span class="btn-label"><i class="ph ph-hand-coins"></i> Add Money</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-7">
+    <div class="card-fmt">
+      <div class="card-fmt-header">
+        <h2>Recent Money Transactions</h2>
+      </div>
+      {% if recent_transactions %}
+      <div class="table-fmt-wrap">
+        <table class="table-fmt">
+          <thead>
+            <tr><th>Date</th><th>Employee</th><th class="num">Amount</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            {% for t in recent_transactions %}
+            <tr>
+              <td>{{ t.created_at.strftime('%d %b %Y') }}</td>
+              <td><span class="employee-id-badge">{{ t.user.employee_id }}</span> {{ t.user.name }}</td>
+              <td class="num mono">{{ t.amount|inr }}</td>
+              <td>{{ t.purpose }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      {{ m.empty_state('ph-hand-coins', 'No transactions yet', 'Money added to employees will appear here.') }}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}

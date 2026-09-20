@@ -1,0 +1,135 @@
+{% extends "layout_admin.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}{{ employee.name }}{% endblock %}
+{% block page_title %}Employee Details{% endblock %}
+{% block page_subtitle %}<p>Complete profile, balance and expense history.</p>{% endblock %}
+
+{% block page_content %}
+
+<div class="card-fmt card-fmt-body mb-4">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+    <div class="d-flex align-items-center gap-3">
+      {% if employee.profile_image %}
+        <img src="{{ url_for('auth.profile_image', filename=employee.profile_image) }}" alt="{{ employee.name }}" class="avatar-preview">
+      {% else %}
+        <span class="avatar-placeholder">{{ employee.name[:1]|upper }}</span>
+      {% endif %}
+      <div>
+        <h2 class="h5 mb-1">{{ employee.name }}</h2>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="employee-id-badge">{{ employee.employee_id }}</span>
+          {{ m.status_pill(employee.status) }}
+        </div>
+        <p class="text-muted-fmt mb-0 mt-1" style="font-size:0.85rem;">
+          <i class="ph ph-phone"></i> {{ employee.mobile }} &nbsp;·&nbsp; <i class="ph ph-envelope-simple"></i> {{ employee.email }}
+        </p>
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('admin.add_money', employee_id=employee.id) }}" class="btn-fmt btn-fmt-primary"><i class="ph ph-hand-coins"></i> Add Money</a>
+      <a href="{{ url_for('admin.edit_employee', user_id=employee.id) }}" class="btn-fmt btn-fmt-outline"><i class="ph ph-pencil-simple"></i> Edit</a>
+      <button type="button" class="btn-fmt btn-fmt-outline" data-bs-toggle="modal" data-bs-target="#resetPasswordModal"><i class="ph ph-key"></i> Reset Password</button>
+    </div>
+  </div>
+</div>
+
+<div class="kpi-grid kpi-grid-5">
+  {{ m.kpi_card('ph-hand-coins', 'brand', 'Total Received', totals.received|inr) }}
+  {{ m.kpi_card('ph-receipt', 'navy', 'Total Spent', totals.spent|inr) }}
+  {{ m.kpi_card('ph-truck', 'brand', 'Logistics', totals.logistics|inr) }}
+  {{ m.kpi_card('ph-warehouse', 'info', 'Warehousing', totals.warehousing|inr) }}
+  {{ m.kpi_card('ph-wallet', 'success', 'Remaining Balance', totals.balance|inr) }}
+</div>
+
+<div class="card-fmt mb-4">
+  <div class="card-fmt-header">
+    <h2>Complete Expense History</h2>
+  </div>
+  {% if expenses %}
+  <div class="table-fmt-wrap">
+    <table class="table-fmt">
+      <thead>
+        <tr>
+          <th>Date</th><th>Type</th><th class="num">Amount</th><th>Docket No.</th><th>Status</th><th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in expenses %}
+        <tr>
+          <td>{{ e.created_at.strftime('%d %b %Y') }}</td>
+          <td>{{ m.type_tag(e.expense_type) }}</td>
+          <td class="num mono">{{ e.amount|inr }}</td>
+          <td>{{ e.docket_no or 'N/A' }}</td>
+          <td>{{ m.status_pill(e.payment_status) }}</td>
+          <td><a href="{{ url_for('admin.expense_detail', expense_id=e.id) }}" class="btn-fmt btn-fmt-ghost btn-fmt-sm">View Details</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ m.empty_state('ph-receipt', 'No expenses yet', 'This employee has not submitted any expenses.') }}
+  {% endif %}
+</div>
+
+<div class="card-fmt">
+  <div class="card-fmt-header">
+    <h2>Money Transaction History</h2>
+  </div>
+  {% if transactions %}
+  <div class="table-fmt-wrap">
+    <table class="table-fmt">
+      <thead>
+        <tr><th>Date</th><th>Transaction ID</th><th class="num">Amount</th><th>Purpose</th><th>Remarks</th><th>Created By</th></tr>
+      </thead>
+      <tbody>
+        {% for t in transactions %}
+        <tr>
+          <td>{{ t.created_at.strftime('%d %b %Y, %I:%M %p') }}</td>
+          <td class="mono">{{ t.display_id }}</td>
+          <td class="num mono">{{ t.amount|inr }}</td>
+          <td>{{ t.purpose }}</td>
+          <td>{{ t.remarks or '—' }}</td>
+          <td>{{ t.created_by }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ m.empty_state('ph-hand-coins', 'No money added yet', 'Money credited to this employee will appear here.') }}
+  {% endif %}
+</div>
+
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('admin.reset_password', user_id=employee.id) }}" data-lock-submit novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="resetPasswordModalLabel">Reset Password — {{ employee.employee_id }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group-fmt">
+            <label class="form-label-fmt" for="new_password">New Password<span class="required">*</span></label>
+            <input type="password" class="form-control-fmt" id="new_password" name="new_password" minlength="6" required>
+          </div>
+          <div class="form-group-fmt mb-0">
+            <label class="form-label-fmt" for="confirm_password">Confirm New Password<span class="required">*</span></label>
+            <input type="password" class="form-control-fmt" id="confirm_password" name="confirm_password" minlength="6" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-fmt btn-fmt-outline" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-fmt btn-fmt-primary">
+            <span class="btn-spinner"></span>
+            <span class="btn-label">Reset Password</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

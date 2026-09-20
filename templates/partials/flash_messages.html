@@ -1,0 +1,13 @@
+<div class="toast-stack">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      {% set cat = 'success' if category == 'success' else ('error' if category == 'error' else ('warning' if category == 'warning' else 'info')) %}
+      {% set icon = 'check-circle' if cat == 'success' else ('x-circle' if cat == 'error' else ('warning' if cat == 'warning' else 'info')) %}
+      <div class="toast-fmt {{ cat }}" role="status">
+        <i class="ph ph-{{ icon }} toast-icon" aria-hidden="true"></i>
+        <div>{{ message }}</div>
+        <button type="button" class="toast-close" aria-label="Dismiss notification">&times;</button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+</div>

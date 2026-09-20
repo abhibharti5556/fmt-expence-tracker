@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block body %}
+<div class="auth-shell">
+  <div class="auth-card" style="max-width: 520px;">
+    <div class="auth-logo">
+      <img src="{{ url_for('static', filename='images/final-mile-techies-logo.png') }}" alt="Final Mile Techies logo">
+      <h1>Final Mile Techies</h1>
+      <p>Expense Management System</p>
+    </div>
+
+    <div class="auth-role-grid">
+      <a href="{{ url_for('auth.admin_login') }}" class="auth-role-card">
+        <i class="ph ph-shield-check"></i>
+        <h3>Admin Login</h3>
+        <p>Manage employees, money &amp; reports</p>
+      </a>
+      <a href="{{ url_for('auth.employee_login') }}" class="auth-role-card">
+        <i class="ph ph-user"></i>
+        <h3>Employee Login</h3>
+        <p>Submit &amp; track your expenses</p>
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

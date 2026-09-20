@@ -1,0 +1,156 @@
+{% extends "layout_admin.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}{{ expense.transaction_id }}{% endblock %}
+{% block page_title %}Expense Details{% endblock %}
+{% block page_subtitle %}<p>Complete audit record for {{ expense.transaction_id }}.</p>{% endblock %}
+
+{% block page_content %}
+
+<a href="{{ back_url or url_for('admin.expenses') }}" class="auth-back-link"><i class="ph ph-arrow-left"></i> Back to Expenses</a>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-8">
+
+    <div class="card-fmt card-fmt-body mb-4">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+        <div>
+          <span class="mono text-muted-fmt" style="font-size:0.85rem;">{{ expense.transaction_id }}</span>
+          <h2 class="h4 mb-0 mt-1">{{ expense.amount|inr }}</h2>
+        </div>
+        <div class="text-end">
+          {{ m.type_tag(expense.expense_type) }}
+          <div class="mt-2">{{ m.status_pill(expense.payment_status) }}</div>
+        </div>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <div class="detail-label">Date</div>
+          <div class="detail-value">{{ expense.created_at.strftime('%d %b %Y') }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Time</div>
+          <div class="detail-value">{{ expense.created_at.strftime('%I:%M %p') }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-fmt card-fmt-body mb-4">
+      <h3 class="h6 mb-3">Expense Information</h3>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <div class="detail-label">Amount</div>
+          <div class="detail-value mono">{{ expense.amount|inr }}</div>
+        </div>
+        {% if expense.expense_type == 'LOGISTICS' %}
+        <div class="detail-item">
+          <div class="detail-label">Docket Number</div>
+          <div class="detail-value">{{ expense.docket_no or 'N/A' }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Purpose</div>
+          <div class="detail-value">{{ expense.purpose }}</div>
+        </div>
+        {% else %}
+        <div class="detail-item">
+          <div class="detail-label">Purpose</div>
+          <div class="detail-value">{{ expense.purpose }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Why is this Expense Required?</div>
+          <div class="detail-value">{{ expense.reason or 'N/A' }}</div>
+        </div>
+        {% endif %}
+        <div class="detail-item">
+          <div class="detail-label">Approved By</div>
+          <div class="detail-value">{{ expense.approved_by }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Remarks</div>
+          <div class="detail-value">{{ expense.remarks or '—' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-fmt card-fmt-body mb-4">
+      <h3 class="h6 mb-3">Payment Information</h3>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <div class="detail-label">UPI Reference Number</div>
+          <div class="detail-value mono">{{ expense.upi_reference_no }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Payment Status</div>
+          <div class="detail-value">{{ m.status_pill(expense.payment_status) }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Payment Date</div>
+          <div class="detail-value">{{ expense.created_at.strftime('%d %b %Y') }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Payment Time</div>
+          <div class="detail-value">{{ expense.created_at.strftime('%I:%M %p') }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-12 col-md-6">
+        <h3 class="h6 mb-3">Invoice / Supporting Document</h3>
+        {% set inv_ext = expense.invoice_file.rsplit('.', 1)[-1]|lower %}
+        <div class="doc-preview-card">
+          {% if inv_ext in ['jpg','jpeg','png','webp'] %}
+            <img src="{{ url_for('admin.expense_invoice', expense_id=expense.id) }}" alt="Invoice document">
+          {% else %}
+            <div class="doc-pdf-placeholder">
+              <i class="ph ph-file-pdf"></i>
+              <span>PDF Document</span>
+            </div>
+          {% endif %}
+          <div class="doc-actions">
+            <a href="{{ url_for('admin.expense_invoice', expense_id=expense.id) }}" target="_blank" class="btn-fmt btn-fmt-outline btn-fmt-sm"><i class="ph ph-eye"></i> View</a>
+            <a href="{{ url_for('admin.expense_invoice', expense_id=expense.id) }}" target="_blank" class="btn-fmt btn-fmt-outline btn-fmt-sm"><i class="ph ph-arrow-square-out"></i> Open</a>
+            <a href="{{ url_for('admin.expense_invoice', expense_id=expense.id, download=1) }}" class="btn-fmt btn-fmt-outline btn-fmt-sm"><i class="ph ph-download-simple"></i> Download</a>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <h3 class="h6 mb-3">Successful Payment Screenshot</h3>
+        <div class="doc-preview-card">
+          <img src="{{ url_for('admin.expense_screenshot', expense_id=expense.id) }}" alt="Payment screenshot">
+          <div class="doc-actions">
+            <a href="{{ url_for('admin.expense_screenshot', expense_id=expense.id) }}" target="_blank" class="btn-fmt btn-fmt-outline btn-fmt-sm"><i class="ph ph-arrows-out"></i> View Full Size</a>
+            <a href="{{ url_for('admin.expense_screenshot', expense_id=expense.id) }}" target="_blank" class="btn-fmt btn-fmt-outline btn-fmt-sm"><i class="ph ph-arrow-square-out"></i> Open</a>
+            <a href="{{ url_for('admin.expense_screenshot', expense_id=expense.id, download=1) }}" class="btn-fmt btn-fmt-outline btn-fmt-sm"><i class="ph ph-download-simple"></i> Download</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="col-12 col-lg-4">
+    <div class="card-fmt card-fmt-body">
+      <h3 class="h6 mb-3">Employee Information</h3>
+      <div class="d-flex align-items-center gap-3 mb-3">
+        {% if expense.user.profile_image %}
+          <img src="{{ url_for('auth.profile_image', filename=expense.user.profile_image) }}" alt="{{ expense.user.name }}" class="avatar-preview" style="width:64px;height:64px;">
+        {% else %}
+          <span class="avatar-placeholder" style="width:64px;height:64px;">{{ expense.user.name[:1]|upper }}</span>
+        {% endif %}
+        <div>
+          <div class="fw-semibold">{{ expense.user.name }}</div>
+          <span class="employee-id-badge">{{ expense.user.employee_id }}</span>
+        </div>
+      </div>
+      <div class="summary-list">
+        <div class="summary-row"><span class="label">Mobile</span><span class="value">{{ expense.user.mobile }}</span></div>
+        <div class="summary-row"><span class="label">Email</span><span class="value">{{ expense.user.email }}</span></div>
+      </div>
+      <a href="{{ url_for('admin.employee_detail', user_id=expense.user.id) }}" class="btn-fmt btn-fmt-outline btn-fmt-block mt-3">
+        <i class="ph ph-user"></i> View Full Employee Profile
+      </a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

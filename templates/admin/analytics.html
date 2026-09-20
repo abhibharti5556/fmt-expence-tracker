@@ -1,0 +1,142 @@
+{% extends "layout_admin.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}Employee Analytics{% endblock %}
+{% block page_title %}Employee Analytics{% endblock %}
+{% block page_subtitle %}<p>Deep-dive into an individual employee's spending.</p>{% endblock %}
+
+{% block page_content %}
+
+<div class="filter-bar">
+  <form method="get" class="d-flex gap-2 flex-wrap align-items-end">
+    <div style="flex:1; min-width:240px;">
+      <label class="form-label-fmt">Select Employee</label>
+      <select class="form-select-fmt" name="employee_id">
+        <option value="">Choose an employee…</option>
+        {% for emp in employee_list %}
+        <option value="{{ emp.id }}" {{ 'selected' if selected and selected.id == emp.id }}>{{ emp.employee_id }} — {{ emp.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn-fmt btn-fmt-primary"><i class="ph ph-chart-line-up"></i> View Analytics</button>
+  </form>
+</div>
+
+{% if selected %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  {% if selected.profile_image %}
+    <img src="{{ url_for('auth.profile_image', filename=selected.profile_image) }}" alt="{{ selected.name }}" class="avatar-preview" style="width:56px;height:56px;">
+  {% else %}
+    <span class="avatar-placeholder" style="width:56px;height:56px;">{{ selected.name[:1]|upper }}</span>
+  {% endif %}
+  <div>
+    <h2 class="h5 mb-0">{{ selected.name }}</h2>
+    <span class="employee-id-badge">{{ selected.employee_id }}</span>
+  </div>
+</div>
+
+<div class="kpi-grid kpi-grid-6">
+  {{ m.kpi_card('ph-hand-coins', 'brand', 'Total Received', totals.received|inr) }}
+  {{ m.kpi_card('ph-receipt', 'navy', 'Total Spent', totals.spent|inr) }}
+  {{ m.kpi_card('ph-truck', 'brand', 'Logistics', totals.logistics|inr) }}
+  {{ m.kpi_card('ph-warehouse', 'info', 'Warehousing', totals.warehousing|inr) }}
+  {{ m.kpi_card('ph-wallet', 'success', 'Remaining Balance', totals.balance|inr) }}
+  {{ m.kpi_card('ph-arrows-left-right', 'navy', 'Transactions', totals.transaction_count) }}
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-8">
+    <div class="card-fmt chart-card h-100">
+      <h3 class="h6 mb-3">Daily Spending Trend</h3>
+      {% if daily_labels %}
+      <div class="chart-wrap">
+        <canvas id="employeeDailyChart" role="img" aria-label="Line chart of this employee's daily spending"></canvas>
+      </div>
+      {% else %}
+      {{ m.empty_state('ph-chart-line-up', 'No spending yet', 'This employee has not submitted any expenses yet.') }}
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="card-fmt chart-card h-100">
+      <h3 class="h6 mb-3">Logistics vs Warehousing</h3>
+      <div class="chart-wrap sm">
+        <canvas id="employeeSplitChart" role="img" aria-label="Doughnut chart of logistics vs warehousing spend"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+
+<div class="card-fmt">
+  <div class="card-fmt-header"><h2>Employees Ranked by Spend</h2></div>
+  {% if totals.ranked %}
+  <div class="table-fmt-wrap">
+    <table class="table-fmt">
+      <thead><tr><th>Employee</th><th class="num">Received</th><th class="num">Spent</th><th class="num">Balance</th><th></th></tr></thead>
+      <tbody>
+        {% for row in totals.ranked %}
+        <tr>
+          <td><span class="employee-id-badge">{{ row.user.employee_id }}</span> {{ row.user.name }}</td>
+          <td class="num mono">{{ row.received|inr }}</td>
+          <td class="num mono">{{ row.spent|inr }}</td>
+          <td class="num mono">{{ row.balance|inr }}</td>
+          <td><a href="{{ url_for('admin.analytics', employee_id=row.user.id) }}" class="btn-fmt btn-fmt-ghost btn-fmt-sm">View</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ m.empty_state('ph-chart-line-up', 'No spending yet', 'Analytics will appear here once employees start submitting expenses.') }}
+  {% endif %}
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+{% if selected %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+  Chart.defaults.font.family = "'Source Sans 3', sans-serif";
+  Chart.defaults.color = '#8A93A2';
+
+  {% if daily_labels %}
+  new Chart(document.getElementById('employeeDailyChart'), {
+    type: 'line',
+    data: {
+      labels: {{ daily_labels|tojson }},
+      datasets: [{
+        label: 'Spending',
+        data: {{ daily_values|tojson }},
+        borderColor: '#F2A61D',
+        backgroundColor: 'rgba(242, 166, 29, 0.15)',
+        fill: true,
+        tension: 0.35,
+        pointRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#E4E7EC' }, ticks: { callback: (v) => '₹' + v.toLocaleString('en-IN') } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+  {% endif %}
+
+  new Chart(document.getElementById('employeeSplitChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Logistics', 'Warehousing'],
+      datasets: [{ data: [{{ logistics_total }}, {{ warehousing_total }}], backgroundColor: ['#F2A61D', '#1B2130'], borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+  });
+</script>
+{% endif %}
+{% endblock %}

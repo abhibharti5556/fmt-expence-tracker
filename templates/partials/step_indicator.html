@@ -1,0 +1,20 @@
+{% macro steps(current) %}
+{% set labels = ['Expense Details', 'Review', 'Pay', 'Payment Confirmation', 'Submit'] %}
+<div class="step-indicator">
+  {% for label in labels %}
+    {% set step_num = loop.index %}
+    <div class="step {{ 'done' if step_num < current else ('active' if step_num == current else '') }}">
+      <span class="step-circle">
+        {% if step_num < current %}<i class="ph ph-check"></i>{% else %}{{ step_num }}{% endif %}
+      </span>
+      <span class="step-label">{{ label }}</span>
+    </div>
+    {% if not loop.last %}
+      <div class="step-connector {{ 'done' if step_num < current }}"></div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% if current <= labels|length %}
+<p class="step-current-label">Step {{ current }} of {{ labels|length }} — {{ labels[current - 1] }}</p>
+{% endif %}
+{% endmacro %}

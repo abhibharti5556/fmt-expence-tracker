@@ -1,0 +1,28 @@
+{% extends "layout_employee.html" %}
+{% block title %}New Expense{% endblock %}
+{% block page_title %}New Expense{% endblock %}
+{% block page_subtitle %}<p>Choose an expense type to get started.</p>{% endblock %}
+
+{% block page_content %}
+<div class="container-medium">
+
+  <div class="inline-alert info mb-4">
+    <i class="ph ph-wallet"></i>
+    <div><strong>Available Balance</strong> {{ balance|inr }}</div>
+  </div>
+
+  <div class="auth-role-grid">
+    <a href="{{ url_for('employee.expense_logistics') }}" class="auth-role-card">
+      <i class="ph ph-truck"></i>
+      <h3>Logistics</h3>
+      <p>Transport, loading/unloading, toll, fuel &amp; delivery expenses</p>
+    </a>
+    <a href="{{ url_for('employee.expense_warehousing') }}" class="auth-role-card">
+      <i class="ph ph-warehouse"></i>
+      <h3>Warehousing</h3>
+      <p>Packaging, storage &amp; warehouse operations expenses</p>
+    </a>
+  </div>
+
+</div>
+{% endblock %}

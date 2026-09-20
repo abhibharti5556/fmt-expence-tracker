@@ -1,0 +1,105 @@
+{% extends "layout_employee.html" %}
+{% block title %}My Profile{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+{% block page_subtitle %}<p>Manage your personal details and profile photo.</p>{% endblock %}
+
+{% block page_content %}
+
+<div class="row g-4">
+  <div class="col-12 col-lg-7">
+    <div class="card-fmt card-fmt-body">
+      <form method="post" enctype="multipart/form-data" data-lock-submit novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt">Profile Photo</label>
+          <div class="avatar-upload">
+            {% if user.profile_image %}
+              <img src="{{ url_for('auth.profile_image', filename=user.profile_image) }}" alt="{{ user.name }}" class="avatar-preview" id="avatarPreviewImg">
+            {% else %}
+              <span class="avatar-placeholder" id="avatarPreviewImg">{{ user.name[:1]|upper }}</span>
+            {% endif %}
+            <div>
+              <label for="photo" class="btn-fmt btn-fmt-outline btn-fmt-sm" style="cursor:pointer;">
+                <i class="ph ph-camera"></i> Change Photo
+              </label>
+              <input type="file" id="photo" name="photo" accept=".jpg,.jpeg,.png,.webp" class="visually-hidden" data-avatar-preview="avatarPreviewImg">
+              <p class="form-hint mb-0">JPG, JPEG, PNG or WEBP.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt">Employee ID</label>
+          <div class="field-locked">
+            {{ user.employee_id }}
+            <span class="lock-note"><i class="ph ph-lock-simple"></i> Fixed by Admin</span>
+          </div>
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="name">Full Name<span class="required">*</span></label>
+          <input type="text" class="form-control-fmt" id="name" name="name" required
+                 value="{{ (form.name if form else user.name) or '' }}">
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12 col-sm-6">
+            <div class="form-group-fmt">
+              <label class="form-label-fmt" for="mobile">Mobile Number<span class="required">*</span></label>
+              <input type="tel" class="form-control-fmt" id="mobile" name="mobile" required
+                     value="{{ (form.mobile if form else user.mobile) or '' }}">
+            </div>
+          </div>
+          <div class="col-12 col-sm-6">
+            <div class="form-group-fmt">
+              <label class="form-label-fmt" for="email">Email ID<span class="required">*</span></label>
+              <input type="email" class="form-control-fmt" id="email" name="email" required
+                     value="{{ (form.email if form else user.email) or '' }}">
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-fmt btn-fmt-primary btn-fmt-lg">
+          <span class="btn-spinner"></span>
+          <span class="btn-label"><i class="ph ph-check"></i> Save Changes</span>
+        </button>
+      </form>
+
+      {% if user.profile_image %}
+      <form method="post" action="{{ url_for('employee.remove_photo') }}" class="mt-2" data-confirm="Remove your profile photo?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-fmt btn-fmt-ghost btn-fmt-sm"><i class="ph ph-trash"></i> Remove Photo</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card-fmt card-fmt-body">
+      <h2 class="h6 mb-3">Change Password</h2>
+      <form method="post" action="{{ url_for('employee.change_password') }}" data-lock-submit novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="current_password">Current Password<span class="required">*</span></label>
+          <input type="password" class="form-control-fmt" id="current_password" name="current_password" required>
+        </div>
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="new_password">New Password<span class="required">*</span></label>
+          <input type="password" class="form-control-fmt" id="new_password" name="new_password" minlength="6" required>
+        </div>
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="confirm_password">Confirm New Password<span class="required">*</span></label>
+          <input type="password" class="form-control-fmt" id="confirm_password" name="confirm_password" minlength="6" required>
+        </div>
+        <button type="submit" class="btn-fmt btn-fmt-outline btn-fmt-block">
+          <span class="btn-spinner"></span>
+          <span class="btn-label"><i class="ph ph-key"></i> Change Password</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

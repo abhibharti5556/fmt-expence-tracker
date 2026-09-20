@@ -1,0 +1,40 @@
+<aside class="sidebar" id="appSidebar">
+  <div class="sidebar-brand">
+    <img src="{{ url_for('static', filename='images/final-mile-techies-logo.png') }}" alt="Final Mile Techies logo">
+    <div class="sidebar-brand-text">
+      <strong>Final Mile Techies</strong>
+      <span>Expense Dashboard</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a href="{{ url_for('admin.dashboard') }}" class="sidebar-link {{ 'active' if request.endpoint == 'admin.dashboard' }}">
+      <i class="ph ph-squares-four"></i> Dashboard
+    </a>
+    <a href="{{ url_for('admin.employees') }}" class="sidebar-link {{ 'active' if request.endpoint in ['admin.employees','admin.add_employee','admin.employee_detail','admin.edit_employee'] }}">
+      <i class="ph ph-users"></i> Employees
+    </a>
+    <a href="{{ url_for('admin.add_money') }}" class="sidebar-link {{ 'active' if request.endpoint == 'admin.add_money' }}">
+      <i class="ph ph-hand-coins"></i> Add Money
+    </a>
+    <a href="{{ url_for('admin.expenses') }}" class="sidebar-link {{ 'active' if request.endpoint in ['admin.expenses','admin.expense_detail'] }}">
+      <i class="ph ph-receipt"></i> Expenses
+    </a>
+    <a href="{{ url_for('admin.analytics') }}" class="sidebar-link {{ 'active' if request.endpoint == 'admin.analytics' }}">
+      <i class="ph ph-chart-line-up"></i> Employee Analytics
+    </a>
+    <a href="{{ url_for('admin.reports') }}" class="sidebar-link {{ 'active' if request.endpoint in ['admin.reports'] }}">
+      <i class="ph ph-file-xls"></i> Reports
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <a href="{{ url_for('admin.profile') }}" class="sidebar-link {{ 'active' if request.endpoint == 'admin.profile' }}">
+      <i class="ph ph-user-circle"></i> Profile
+    </a>
+    <a href="{{ url_for('auth.logout') }}" class="sidebar-link">
+      <i class="ph ph-sign-out"></i> Logout
+    </a>
+  </div>
+</aside>
+<div class="sidebar-backdrop" id="sidebarBackdrop" data-sidebar-toggle></div>

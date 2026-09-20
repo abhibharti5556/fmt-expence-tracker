@@ -1,0 +1,41 @@
+{% extends "layout_employee.html" %}
+{% import "partials/step_indicator.html" as si %}
+{% block title %}Pay{% endblock %}
+{% block page_title %}Make Payment{% endblock %}
+{% block page_subtitle %}<p>Complete the UPI payment, then continue to confirm.</p>{% endblock %}
+
+{% block page_content %}
+<div class="container-narrow">
+  {{ si.steps(3) }}
+
+  <div class="card-fmt">
+    <div class="upi-pay-box">
+      <i class="ph ph-qr-code" style="font-size:2.4rem; color: var(--color-brand);"></i>
+      <div class="upi-pay-amount">{{ amount|inr }}</div>
+      <p class="text-muted-fmt">Tap below to open your UPI app and complete the payment to Final Mile Techies.</p>
+
+      <a href="{{ upi_link }}" class="btn-fmt btn-fmt-primary btn-fmt-lg" style="min-width:240px;">
+        <i class="ph ph-arrow-square-out"></i> Open UPI App
+      </a>
+
+      <div class="inline-alert info mt-4 text-start">
+        <i class="ph ph-info"></i>
+        <div>
+          Not all UPI apps automatically return your transaction number to this app. After completing payment,
+          come back here and enter your <strong>UPI reference number</strong> along with a screenshot of the
+          successful payment.
+        </div>
+      </div>
+
+      <hr class="divider-fmt">
+
+      <a href="{{ url_for('employee.expense_confirm') }}" class="btn-fmt btn-fmt-dark btn-fmt-lg btn-fmt-block">
+        <i class="ph ph-check-circle"></i> I've Completed the Payment — Continue
+      </a>
+      <a href="{{ url_for('employee.expense_review') }}" class="btn-fmt btn-fmt-ghost mt-2">
+        <i class="ph ph-arrow-left"></i> Back to Review
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

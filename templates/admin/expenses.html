@@ -1,0 +1,92 @@
+{% extends "layout_admin.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}All Expenses{% endblock %}
+{% block page_title %}All Expenses{% endblock %}
+{% block page_subtitle %}<p>Every expense submitted across the company.</p>{% endblock %}
+
+{% block page_content %}
+
+<div class="filter-bar">
+  <form method="get">
+    <div class="filter-grid">
+      <div>
+        <label class="form-label-fmt">From Date</label>
+        <input type="date" class="form-control-fmt" name="from_date" value="{{ args.get('from_date','') }}">
+      </div>
+      <div>
+        <label class="form-label-fmt">To Date</label>
+        <input type="date" class="form-control-fmt" name="to_date" value="{{ args.get('to_date','') }}">
+      </div>
+      <div>
+        <label class="form-label-fmt">Employee</label>
+        <select class="form-select-fmt" name="employee_id">
+          <option value="">All Employees</option>
+          {% for emp in employee_list %}
+          <option value="{{ emp.employee_id }}" {{ 'selected' if args.get('employee_id') == emp.employee_id }}>{{ emp.employee_id }} — {{ emp.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label-fmt">Expense Type</label>
+        <select class="form-select-fmt" name="expense_type">
+          <option value="">All Types</option>
+          <option value="LOGISTICS" {{ 'selected' if args.get('expense_type') == 'LOGISTICS' }}>Logistics</option>
+          <option value="WAREHOUSING" {{ 'selected' if args.get('expense_type') == 'WAREHOUSING' }}>Warehousing</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label-fmt">Status</label>
+        <select class="form-select-fmt" name="status">
+          <option value="">All Statuses</option>
+          <option value="SUBMITTED" {{ 'selected' if args.get('status') == 'SUBMITTED' }}>Submitted</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label-fmt">Search</label>
+        <input type="text" class="form-control-fmt" name="q" value="{{ args.get('q','') }}" placeholder="Txn ID, Employee, Docket, UPI Ref">
+      </div>
+    </div>
+    <div class="filter-actions mt-3">
+      <button type="submit" class="btn-fmt btn-fmt-primary"><i class="ph ph-funnel"></i> Apply Filters</button>
+      <a href="{{ url_for('admin.expenses') }}" class="btn-fmt btn-fmt-outline">Reset</a>
+      <a href="{{ url_for('admin.reports', **args) }}" class="btn-fmt btn-fmt-outline"><i class="ph ph-download-simple"></i> Download Report</a>
+    </div>
+  </form>
+</div>
+
+<div class="card-fmt">
+  {% if expenses %}
+  <div class="table-fmt-wrap">
+    <table class="table-fmt">
+      <thead>
+        <tr>
+          <th>Date</th><th>Transaction ID</th><th>Employee</th><th>Type</th><th>Docket No.</th>
+          <th class="num">Amount</th><th>Purpose</th><th>Approved By</th><th>UPI Ref</th><th>Status</th><th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in expenses %}
+        <tr>
+          <td>{{ e.created_at.strftime('%d %b %Y') }}</td>
+          <td class="mono">{{ e.transaction_id }}</td>
+          <td><span class="employee-id-badge">{{ e.user.employee_id }}</span> {{ e.user.name }}</td>
+          <td>{{ m.type_tag(e.expense_type) }}</td>
+          <td>{{ e.docket_no or 'N/A' }}</td>
+          <td class="num mono">{{ e.amount|inr }}</td>
+          <td>{{ e.purpose }}</td>
+          <td>{{ e.approved_by }}</td>
+          <td class="mono">{{ e.upi_reference_no }}</td>
+          <td>{{ m.status_pill(e.payment_status) }}</td>
+          <td><a href="{{ url_for('admin.expense_detail', expense_id=e.id) }}" class="btn-fmt btn-fmt-ghost btn-fmt-sm">View</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ m.render_pagination(pagination, 'admin.expenses') }}
+  {% else %}
+  {{ m.empty_state('ph-receipt', 'No expenses found', 'There are no expenses matching your selected filters.') }}
+  {% endif %}
+</div>
+
+{% endblock %}

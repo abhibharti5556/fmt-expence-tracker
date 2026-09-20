@@ -1,0 +1,26 @@
+{% extends "layout_admin.html" %}
+{% block title %}Admin Profile{% endblock %}
+{% block page_title %}Profile{% endblock %}
+{% block page_subtitle %}<p>Your administrator account details.</p>{% endblock %}
+
+{% block page_content %}
+<div class="container-narrow">
+  <div class="card-fmt card-fmt-body text-center">
+    <span class="avatar-placeholder mx-auto mb-3"><i class="ph ph-shield-check"></i></span>
+    <h2 class="h5 mb-0">Final Mile Techies</h2>
+    <p class="text-muted-fmt">Administrator</p>
+
+    <hr class="divider-fmt">
+
+    <div class="summary-list text-start">
+      <div class="summary-row"><span class="label">Username</span><span class="value">{{ admin_username }}</span></div>
+      <div class="summary-row"><span class="label">Company Name</span><span class="value">{{ company_name }}</span></div>
+      <div class="summary-row"><span class="label">Role</span><span class="value">Administrator</span></div>
+    </div>
+
+    <p class="form-hint mt-4 text-start">
+      <i class="ph ph-info"></i> Admin credentials and company UPI settings are configured securely via environment variables and are not editable here.
+    </p>
+  </div>
+</div>
+{% endblock %}

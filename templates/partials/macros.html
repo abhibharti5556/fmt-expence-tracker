@@ -1,0 +1,83 @@
+{% macro kpi_card(icon, icon_class, label, value, sub=None) %}
+<div class="kpi-card">
+  <div class="kpi-card-top">
+    <span class="kpi-label">{{ label }}</span>
+    <span class="kpi-icon {{ icon_class }}"><i class="ph {{ icon }}" aria-hidden="true"></i></span>
+  </div>
+  <div class="kpi-value">{{ value }}</div>
+  {% if sub %}<div class="kpi-sub">{{ sub }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro empty_state(icon, title, message, action_url=None, action_label=None) %}
+<div class="empty-state">
+  <i class="ph {{ icon }}" aria-hidden="true"></i>
+  <h3>{{ title }}</h3>
+  <p>{{ message }}</p>
+  {% if action_url %}
+  <a href="{{ action_url }}" class="btn-fmt btn-fmt-primary"><i class="ph ph-plus"></i> {{ action_label }}</a>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro render_pagination(pagination_obj, endpoint) %}
+{% if pagination_obj and pagination_obj.pages > 1 %}
+<nav class="pagination-fmt" aria-label="Pagination">
+  {% set args = request.args.to_dict() %}
+  {% if pagination_obj.has_prev %}
+    {% set _ = args.update({'page': pagination_obj.prev_num}) %}
+    <a href="{{ url_for(endpoint, **args) }}" aria-label="Previous page"><i class="ph ph-caret-left"></i></a>
+  {% else %}
+    <span class="disabled"><i class="ph ph-caret-left"></i></span>
+  {% endif %}
+
+  {% for p in pagination_obj.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+    {% if p %}
+      {% set _ = args.update({'page': p}) %}
+      {% if p == pagination_obj.page %}
+        <span class="active" aria-current="page">{{ p }}</span>
+      {% else %}
+        <a href="{{ url_for(endpoint, **args) }}">{{ p }}</a>
+      {% endif %}
+    {% else %}
+      <span>&hellip;</span>
+    {% endif %}
+  {% endfor %}
+
+  {% if pagination_obj.has_next %}
+    {% set _ = args.update({'page': pagination_obj.next_num}) %}
+    <a href="{{ url_for(endpoint, **args) }}" aria-label="Next page"><i class="ph ph-caret-right"></i></a>
+  {% else %}
+    <span class="disabled"><i class="ph ph-caret-right"></i></span>
+  {% endif %}
+</nav>
+{% endif %}
+{% endmacro %}
+
+{% macro status_pill(status) %}
+  {% if status == 'SUBMITTED' %}
+    <span class="pill pill-success"><i class="ph ph-check-circle"></i> Submitted</span>
+  {% elif status == 'Active' %}
+    <span class="pill pill-success"><i class="ph ph-check-circle"></i> Active</span>
+  {% elif status == 'Inactive' %}
+    <span class="pill pill-neutral"><i class="ph ph-pause-circle"></i> Inactive</span>
+  {% else %}
+    <span class="pill pill-neutral">{{ status }}</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro type_tag(expense_type) %}
+  {% if expense_type == 'LOGISTICS' %}
+    <span class="type-tag logistics"><i class="ph ph-truck"></i> Logistics</span>
+  {% else %}
+    <span class="type-tag warehousing"><i class="ph ph-warehouse"></i> Warehousing</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro avatar(user, size='sm') %}
+  {% if user.profile_image %}
+    <img src="{{ url_for('auth.profile_image', filename=user.profile_image) }}" alt="{{ user.name }}" class="avatar-{{ size }}">
+  {% else %}
+    <span class="avatar-placeholder-{{ size }}">{{ user.name[:1]|upper }}</span>
+  {% endif %}
+{% endmacro %}

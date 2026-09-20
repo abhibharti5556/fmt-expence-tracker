@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/
+instance/
+uploads/profile_images/*
+!uploads/profile_images/.gitkeep
+uploads/invoices/*
+!uploads/invoices/.gitkeep
+uploads/payment_screenshots/*
+!uploads/payment_screenshots/.gitkeep
+reports/*
+!reports/.gitkeep
+*.xlsx
+.DS_Store
