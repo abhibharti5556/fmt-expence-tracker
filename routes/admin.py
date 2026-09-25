@@ -3,19 +3,24 @@ from datetime import datetime, date, timedelta
 
 from flask import (
     Blueprint, render_template, request, redirect, url_for, flash,
-    current_app, send_from_directory, send_file, abort,
+    current_app, send_from_directory, send_file, abort, session,
 )
 from sqlalchemy import func, or_
 
 from extensions import db
 from models import (
-    User, MoneyTransaction, Expense,
+    User, MoneyTransaction, Expense, AdminUser, AdminAuditLog,
     STATUS_ACTIVE, STATUS_INACTIVE, TRANSACTION_TYPE_CREDIT,
     EXPENSE_TYPE_LOGISTICS, EXPENSE_TYPE_WAREHOUSING, BALANCE_COUNTING_STATUSES,
+    LOGISTICS_CATEGORIES, WAREHOUSING_CATEGORIES, PAYMENT_STATUS_PENDING_APPROVAL, PAYMENT_STATUS_APPROVED,
+    PAYMENT_STATUS_REJECTED,
     log_admin_action,
 )
-from utils.decorators import admin_required
-from utils.helpers import get_employee_balance, get_employee_totals, get_total_spent, get_total_credited
+from utils.decorators import admin_required, current_admin
+from utils.helpers import (
+    get_employee_balance, get_employee_totals, get_total_spent, get_total_credited,
+    validate_image, save_uploaded_file, delete_uploaded_file,
+)
 from utils.excel_reports import build_expense_report, build_money_distribution_report
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -54,6 +59,8 @@ def dashboard():
     monthly_labels, monthly_values = _monthly_expense_trend(months=6)
     employee_labels, employee_values = _employee_wise_spending(limit=10)
 
+    pending_approvals = Expense.query.filter_by(payment_status=PAYMENT_STATUS_PENDING_APPROVAL).count()
+
     kpis = {
         "total_distributed": total_distributed,
         "total_expenses": total_expenses,
@@ -63,6 +70,7 @@ def dashboard():
         "active_employees": active_employees,
         "total_transactions": total_transactions,
         "today_expenses": today_expenses or 0,
+        "pending_approvals": pending_approvals,
     }
 
     return render_template(
@@ -456,6 +464,7 @@ def _filter_expenses_query(args):
     employee_id = args.get("employee_id", "").strip()
     expense_type = args.get("expense_type", "").strip()
     status = args.get("status", "").strip()
+    category = args.get("category", "").strip()
     q = args.get("q", "").strip()
 
     if from_date:
@@ -468,6 +477,8 @@ def _filter_expenses_query(args):
         query = query.filter(Expense.expense_type == expense_type)
     if status:
         query = query.filter(Expense.payment_status == status)
+    if category:
+        query = query.filter(Expense.category == category)
     if q:
         like = f"%{q}%"
         query = query.filter(
@@ -495,6 +506,8 @@ def expenses():
         pagination=pagination,
         expenses=pagination.items,
         employee_list=employee_list,
+        logistics_categories=LOGISTICS_CATEGORIES,
+        warehousing_categories=WAREHOUSING_CATEGORIES,
         args=request.args,
     )
 
@@ -503,7 +516,61 @@ def expenses():
 @admin_required
 def expense_detail(expense_id):
     expense = Expense.query.get_or_404(expense_id)
-    return render_template("admin/expense_detail.html", expense=expense, back_url=url_for("admin.expenses"))
+    logs = (
+        AdminAuditLog.query.filter_by(target_expense_id=expense.id)
+        .order_by(AdminAuditLog.created_at.desc())
+        .all()
+    )
+    return render_template(
+        "admin/expense_detail.html", expense=expense, logs=logs, back_url=url_for("admin.expenses")
+    )
+
+
+@admin_bp.route("/expenses/<int:expense_id>/approve", methods=["POST"])
+@admin_required
+def expense_approve(expense_id):
+    expense = Expense.query.get_or_404(expense_id)
+    if expense.payment_status != PAYMENT_STATUS_PENDING_APPROVAL:
+        flash("Only expenses awaiting approval can be approved.", "error")
+        return redirect(url_for("admin.expense_detail", expense_id=expense.id))
+
+    expense.payment_status = PAYMENT_STATUS_APPROVED
+    expense.rejection_reason = None
+    expense.reviewed_by = _admin_username()
+    expense.reviewed_at = datetime.utcnow()
+    log_admin_action(
+        _admin_username(), "EXPENSE_APPROVED", target_user_id=expense.user_id,
+        target_expense_id=expense.id, detail=f"{expense.transaction_id} ({expense.amount})",
+    )
+    db.session.commit()
+    flash(f"Expense {expense.transaction_id} approved.", "success")
+    return redirect(url_for("admin.expense_detail", expense_id=expense.id))
+
+
+@admin_bp.route("/expenses/<int:expense_id>/reject", methods=["POST"])
+@admin_required
+def expense_reject(expense_id):
+    expense = Expense.query.get_or_404(expense_id)
+    if expense.payment_status != PAYMENT_STATUS_PENDING_APPROVAL:
+        flash("Only expenses awaiting approval can be rejected.", "error")
+        return redirect(url_for("admin.expense_detail", expense_id=expense.id))
+
+    reason = request.form.get("rejection_reason", "").strip()
+    if not reason:
+        flash("Please provide a reason for rejecting this expense.", "error")
+        return redirect(url_for("admin.expense_detail", expense_id=expense.id))
+
+    expense.payment_status = PAYMENT_STATUS_REJECTED
+    expense.rejection_reason = reason
+    expense.reviewed_by = _admin_username()
+    expense.reviewed_at = datetime.utcnow()
+    log_admin_action(
+        _admin_username(), "EXPENSE_REJECTED", target_user_id=expense.user_id,
+        target_expense_id=expense.id, detail=f"{expense.transaction_id} ({expense.amount}): {reason}",
+    )
+    db.session.commit()
+    flash(f"Expense {expense.transaction_id} rejected.", "success")
+    return redirect(url_for("admin.expense_detail", expense_id=expense.id))
 
 
 @admin_bp.route("/expenses/<int:expense_id>/invoice")
@@ -596,6 +663,8 @@ def reports():
         preview=preview,
         total_count=total_count,
         employee_list=employee_list,
+        logistics_categories=LOGISTICS_CATEGORIES,
+        warehousing_categories=WAREHOUSING_CATEGORIES,
         args=request.args,
     )
 
@@ -645,16 +714,297 @@ def download_money_distribution_report():
 
 
 # ---------------------------------------------------------------------------
-# Admin profile
+# Admin profile (self-service — the logged-in admin's own account)
 # ---------------------------------------------------------------------------
 
-@admin_bp.route("/profile")
+@admin_bp.route("/profile", methods=["GET", "POST"])
 @admin_required
 def profile():
-    return render_template("admin/profile.html", admin_username=_admin_username())
+    admin = current_admin()
+    if admin is None:
+        # Legacy env-credential session: no admin_users row to edit.
+        return render_template("admin/profile.html", admin=None, admin_username=_admin_username())
+
+    if request.method == "POST":
+        form = request.form
+        errors = []
+
+        name = form.get("name", "").strip()
+        mobile = form.get("mobile", "").strip()
+        photo = request.files.get("photo")
+
+        if not name:
+            errors.append("Name is required.")
+        if mobile and not MOBILE_RE.match(mobile):
+            errors.append("Enter a valid mobile number.")
+
+        new_filename = None
+        if photo and photo.filename:
+            is_valid, error = validate_image(
+                photo, current_app.config["ALLOWED_IMAGE_EXTENSIONS"], current_app.config["MAX_IMAGE_SIZE"]
+            )
+            if not is_valid:
+                errors.append(error)
+            else:
+                new_filename = save_uploaded_file(
+                    photo, current_app.config["PROFILE_IMAGE_FOLDER"], prefix=f"admin{admin.id}_"
+                )
+
+        if errors:
+            for err in errors:
+                flash(err, "error")
+            return render_template("admin/profile.html", admin=admin, form=form)
+
+        admin.name = name
+        admin.mobile = mobile or None
+        if new_filename:
+            old_photo = admin.profile_image
+            admin.profile_image = new_filename
+            delete_uploaded_file(current_app.config["PROFILE_IMAGE_FOLDER"], old_photo)
+
+        session["username"] = admin.name
+        db.session.commit()
+        flash("Profile updated successfully.", "success")
+        return redirect(url_for("admin.profile"))
+
+    return render_template("admin/profile.html", admin=admin, form=None)
+
+
+@admin_bp.route("/profile/photo/remove", methods=["POST"])
+@admin_required
+def admin_remove_photo():
+    admin = current_admin()
+    if admin and admin.profile_image:
+        delete_uploaded_file(current_app.config["PROFILE_IMAGE_FOLDER"], admin.profile_image)
+        admin.profile_image = None
+        db.session.commit()
+        flash("Profile photo removed.", "success")
+    return redirect(url_for("admin.profile"))
+
+
+@admin_bp.route("/profile/change-password", methods=["POST"])
+@admin_required
+def admin_change_password():
+    admin = current_admin()
+    if admin is None:
+        flash("Password change isn't available for this session.", "error")
+        return redirect(url_for("admin.profile"))
+
+    current_password = request.form.get("current_password", "")
+    new_password = request.form.get("new_password", "")
+    confirm_password = request.form.get("confirm_password", "")
+
+    if not admin.check_password(current_password):
+        flash("Current password is incorrect.", "error")
+    elif len(new_password) < 6:
+        flash("New password must be at least 6 characters.", "error")
+    elif new_password != confirm_password:
+        flash("New passwords do not match.", "error")
+    else:
+        admin.set_password(new_password)
+        db.session.commit()
+        flash("Password changed successfully.", "success")
+
+    return redirect(url_for("admin.profile"))
+
+
+# ---------------------------------------------------------------------------
+# Manage Admins (add/edit other admin accounts)
+# ---------------------------------------------------------------------------
+
+@admin_bp.route("/admins")
+@admin_required
+def admins():
+    rows = AdminUser.query.order_by(AdminUser.created_at.desc()).all()
+    return render_template("admin/admins.html", rows=rows)
+
+
+@admin_bp.route("/admins/add", methods=["GET", "POST"])
+@admin_required
+def add_admin():
+    if request.method == "POST":
+        form = request.form
+        errors = []
+
+        name = form.get("name", "").strip()
+        email = form.get("email", "").strip()
+        mobile = form.get("mobile", "").strip()
+        password = form.get("password", "")
+        confirm_password = form.get("confirm_password", "")
+
+        if not name:
+            errors.append("Name is required.")
+        if not EMAIL_RE.match(email):
+            errors.append("Enter a valid email address.")
+        elif AdminUser.query.filter(AdminUser.email.ilike(email)).first():
+            errors.append(f"An admin account already exists for '{email}'.")
+        if mobile and not MOBILE_RE.match(mobile):
+            errors.append("Enter a valid mobile number.")
+        if len(password) < 6:
+            errors.append("Password must be at least 6 characters.")
+        elif password != confirm_password:
+            errors.append("Passwords do not match.")
+
+        if errors:
+            for err in errors:
+                flash(err, "error")
+            return render_template("admin/admin_form.html", mode="add", form=form, target=None)
+
+        new_admin = AdminUser(name=name, email=email, mobile=mobile or None, status=STATUS_ACTIVE)
+        new_admin.set_password(password)
+        db.session.add(new_admin)
+        db.session.flush()
+
+        log_admin_action(_admin_username(), "CREATE_ADMIN", detail=f"Created admin {email} ({name})")
+        db.session.commit()
+        flash("Admin account created successfully.", "success")
+        return redirect(url_for("admin.admins"))
+
+    return render_template("admin/admin_form.html", mode="add", form=None, target=None)
+
+
+@admin_bp.route("/admins/<int:admin_id>")
+@admin_required
+def admin_detail(admin_id):
+    target = AdminUser.query.get_or_404(admin_id)
+    logs = (
+        AdminAuditLog.query.filter(AdminAuditLog.admin_username.ilike(target.name))
+        .order_by(AdminAuditLog.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    return render_template(
+        "admin/admin_detail.html", target=target, logs=logs, current_admin=current_admin()
+    )
+
+
+@admin_bp.route("/admins/<int:admin_id>/edit", methods=["GET", "POST"])
+@admin_required
+def edit_admin(admin_id):
+    target = AdminUser.query.get_or_404(admin_id)
+
+    if request.method == "POST":
+        form = request.form
+        errors = []
+
+        name = form.get("name", "").strip()
+        mobile = form.get("mobile", "").strip()
+        status = form.get("status", target.status)
+
+        if not name:
+            errors.append("Name is required.")
+        if mobile and not MOBILE_RE.match(mobile):
+            errors.append("Enter a valid mobile number.")
+        if status not in (STATUS_ACTIVE, STATUS_INACTIVE):
+            errors.append("Invalid status.")
+        if status == STATUS_INACTIVE and current_admin() and target.id == current_admin().id:
+            errors.append("You cannot deactivate your own account.")
+
+        if errors:
+            for err in errors:
+                flash(err, "error")
+            return render_template("admin/admin_form.html", mode="edit", form=form, target=target)
+
+        changes = []
+        if target.name != name:
+            changes.append(f"name: '{target.name}' -> '{name}'")
+        if target.mobile != (mobile or None):
+            changes.append(f"mobile: '{target.mobile}' -> '{mobile}'")
+        if target.status != status:
+            changes.append(f"status: '{target.status}' -> '{status}'")
+
+        target.name = name
+        target.mobile = mobile or None
+        target.status = status
+        if changes:
+            log_admin_action(
+                _admin_username(), "EDIT_ADMIN", detail=f"{target.email}: {'; '.join(changes)}",
+            )
+        db.session.commit()
+        flash("Admin details updated successfully.", "success")
+        return redirect(url_for("admin.admin_detail", admin_id=target.id))
+
+    return render_template("admin/admin_form.html", mode="edit", form=None, target=target)
+
+
+@admin_bp.route("/admins/<int:admin_id>/reset-password", methods=["POST"])
+@admin_required
+def reset_admin_password(admin_id):
+    target = AdminUser.query.get_or_404(admin_id)
+    new_password = request.form.get("new_password", "")
+    confirm_password = request.form.get("confirm_password", "")
+
+    if len(new_password) < 6:
+        flash("Password must be at least 6 characters.", "error")
+    elif new_password != confirm_password:
+        flash("Passwords do not match.", "error")
+    else:
+        target.set_password(new_password)
+        log_admin_action(_admin_username(), "RESET_ADMIN_PASSWORD", detail=f"Password reset for {target.email}")
+        db.session.commit()
+        flash(f"Password reset successfully for {target.email}.", "success")
+
+    return redirect(url_for("admin.admin_detail", admin_id=target.id))
+
+
+@admin_bp.route("/admins/<int:admin_id>/toggle-status", methods=["POST"])
+@admin_required
+def toggle_admin_status(admin_id):
+    target = AdminUser.query.get_or_404(admin_id)
+    acting_admin = current_admin()
+    if acting_admin and target.id == acting_admin.id:
+        flash("You cannot deactivate your own account.", "error")
+        return redirect(url_for("admin.admin_detail", admin_id=target.id))
+
+    target.status = STATUS_INACTIVE if target.status == STATUS_ACTIVE else STATUS_ACTIVE
+    log_admin_action(
+        _admin_username(), "TOGGLE_ADMIN_STATUS", detail=f"{target.email} set to {target.status}",
+    )
+    db.session.commit()
+    flash(f"{target.name} is now {target.status}.", "success")
+    return redirect(request.referrer or url_for("admin.admins"))
+
+
+# ---------------------------------------------------------------------------
+# Activity Log
+# ---------------------------------------------------------------------------
+
+@admin_bp.route("/activity-log")
+@admin_required
+def activity_log():
+    query = AdminAuditLog.query
+
+    admin_filter = request.args.get("admin", "").strip()
+    action_filter = request.args.get("action", "").strip()
+    from_date = request.args.get("from_date", "").strip()
+    to_date = request.args.get("to_date", "").strip()
+
+    if admin_filter:
+        query = query.filter(AdminAuditLog.admin_username.ilike(f"%{admin_filter}%"))
+    if action_filter:
+        query = query.filter(AdminAuditLog.action == action_filter)
+    if from_date:
+        query = query.filter(func.date(AdminAuditLog.created_at) >= from_date)
+    if to_date:
+        query = query.filter(func.date(AdminAuditLog.created_at) <= to_date)
+
+    query = query.order_by(AdminAuditLog.created_at.desc())
+    page = request.args.get("page", 1, type=int)
+    pagination = query.paginate(page=page, per_page=current_app.config["ITEMS_PER_PAGE"], error_out=False)
+
+    actions = [row[0] for row in db.session.query(AdminAuditLog.action).distinct().order_by(AdminAuditLog.action)]
+
+    return render_template(
+        "admin/activity_log.html",
+        pagination=pagination,
+        logs=pagination.items,
+        actions=actions,
+        args=request.args,
+    )
 
 
 def _admin_username():
-    from flask import session
-
+    admin = current_admin()
+    if admin:
+        return admin.name
     return session.get("username", current_app.config["ADMIN_USERNAME"])

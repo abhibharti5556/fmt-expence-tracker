@@ -78,15 +78,23 @@ def create_app(test_config=None):
     @app.context_processor
     def inject_globals():
         from datetime import datetime
+        from models import Expense, PAYMENT_STATUS_PENDING_APPROVAL
 
         sidebar_balance = None
         if session.get("role") == "EMPLOYEE" and session.get("user_id"):
             sidebar_balance = get_employee_balance(session["user_id"])
 
+        sidebar_pending_approvals = None
+        if session.get("role") == "ADMIN":
+            sidebar_pending_approvals = Expense.query.filter_by(
+                payment_status=PAYMENT_STATUS_PENDING_APPROVAL
+            ).count()
+
         return {
             "company_name": app.config["COMPANY_NAME"],
             "current_year": datetime.now().year,
             "session_role": session.get("role"),
+            "sidebar_pending_approvals": sidebar_pending_approvals,
             "sidebar_balance": sidebar_balance,
         }
 

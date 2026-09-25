@@ -10,7 +10,10 @@ from flask import (
 from extensions import db
 from models import (
     Expense, MoneyTransaction,
-    EXPENSE_TYPE_LOGISTICS, EXPENSE_TYPE_WAREHOUSING, PAYMENT_STATUS_SUBMITTED,
+    EXPENSE_TYPE_LOGISTICS, EXPENSE_TYPE_WAREHOUSING,
+    LOGISTICS_CATEGORIES, LOGISTICS_CATEGORY_ICONS,
+    WAREHOUSING_CATEGORIES, WAREHOUSING_CATEGORY_ICONS,
+    PAYMENT_STATUS_SUBMITTED, PAYMENT_STATUS_PENDING_APPROVAL,
 )
 from utils.decorators import employee_required, current_employee
 from utils.helpers import (
@@ -235,6 +238,7 @@ def expense_logistics():
 
         amount_raw = form.get("amount", "").strip()
         docket_no = form.get("docket_no", "").strip()
+        category = form.get("category", "").strip()
         purpose = form.get("purpose", "").strip()
         approved_by = form.get("approved_by", "").strip()
         remarks = form.get("remarks", "").strip()
@@ -260,8 +264,12 @@ def expense_logistics():
                     f"Docket Number '{docket_no}' was already used in expense "
                     f"{duplicate.transaction_id}. Please check before submitting again."
                 )
+        if category not in LOGISTICS_CATEGORIES:
+            errors.append("Please select a valid expense category.")
+        elif category == "Others" and not purpose:
+            errors.append("Please describe the expense when selecting 'Others'.")
         if not purpose:
-            errors.append("Purpose of Payment is required.")
+            purpose = category
         if not approved_by:
             errors.append("Approved By is required.")
 
@@ -274,7 +282,10 @@ def expense_logistics():
         if errors:
             for err in errors:
                 flash(err, "error")
-            return render_template("employee/expense_logistics_form.html", form=form, balance=get_employee_balance(user.id))
+            return render_template(
+                "employee/expense_logistics_form.html", form=form, balance=get_employee_balance(user.id),
+                categories=LOGISTICS_CATEGORIES, icons=LOGISTICS_CATEGORY_ICONS,
+            )
 
         invoice_filename = save_uploaded_file(
             invoice, current_app.config["INVOICE_FOLDER"], prefix=f"{user.employee_id}_"
@@ -285,6 +296,7 @@ def expense_logistics():
             "expense_type": EXPENSE_TYPE_LOGISTICS,
             "amount": str(amount),
             "docket_no": docket_no,
+            "category": category,
             "purpose": purpose,
             "approved_by": approved_by,
             "remarks": remarks,
@@ -294,7 +306,8 @@ def expense_logistics():
         return redirect(url_for("employee.expense_review"))
 
     return render_template(
-        "employee/expense_logistics_form.html", form=existing, balance=get_employee_balance(user.id)
+        "employee/expense_logistics_form.html", form=existing, balance=get_employee_balance(user.id),
+        categories=LOGISTICS_CATEGORIES, icons=LOGISTICS_CATEGORY_ICONS,
     )
 
 
@@ -310,6 +323,7 @@ def expense_warehousing():
         errors = []
 
         amount_raw = form.get("amount", "").strip()
+        category = form.get("category", "").strip()
         purpose = form.get("purpose", "").strip()
         reason = form.get("reason", "").strip()
         approved_by = form.get("approved_by", "").strip()
@@ -324,6 +338,8 @@ def expense_warehousing():
             errors.append("Enter a valid amount.")
             amount = 0
 
+        if category not in WAREHOUSING_CATEGORIES:
+            errors.append("Please select a valid expense category.")
         if not purpose:
             errors.append("Purpose of Expense is required.")
         if not reason:
@@ -340,7 +356,10 @@ def expense_warehousing():
         if errors:
             for err in errors:
                 flash(err, "error")
-            return render_template("employee/expense_warehousing_form.html", form=form, balance=get_employee_balance(user.id))
+            return render_template(
+                "employee/expense_warehousing_form.html", form=form, balance=get_employee_balance(user.id),
+                categories=WAREHOUSING_CATEGORIES, icons=WAREHOUSING_CATEGORY_ICONS,
+            )
 
         invoice_filename = save_uploaded_file(
             invoice, current_app.config["INVOICE_FOLDER"], prefix=f"{user.employee_id}_"
@@ -350,6 +369,7 @@ def expense_warehousing():
         session["expense_draft"] = {
             "expense_type": EXPENSE_TYPE_WAREHOUSING,
             "amount": str(amount),
+            "category": category,
             "reason": reason,
             "purpose": purpose,
             "approved_by": approved_by,
@@ -360,7 +380,8 @@ def expense_warehousing():
         return redirect(url_for("employee.expense_review"))
 
     return render_template(
-        "employee/expense_warehousing_form.html", form=existing, balance=get_employee_balance(user.id)
+        "employee/expense_warehousing_form.html", form=existing, balance=get_employee_balance(user.id),
+        categories=WAREHOUSING_CATEGORIES, icons=WAREHOUSING_CATEGORY_ICONS,
     )
 
 
@@ -448,6 +469,12 @@ def expense_confirm():
             screenshot, current_app.config["PAYMENT_SCREENSHOT_FOLDER"], prefix=f"{user.employee_id}_"
         )
 
+        initial_status = (
+            PAYMENT_STATUS_PENDING_APPROVAL
+            if draft["expense_type"] == EXPENSE_TYPE_LOGISTICS
+            else PAYMENT_STATUS_SUBMITTED
+        )
+
         try:
             expense = Expense(
                 transaction_id=generate_transaction_id(),
@@ -455,12 +482,13 @@ def expense_confirm():
                 expense_type=draft["expense_type"],
                 amount=amount,
                 docket_no=draft.get("docket_no"),
+                category=draft.get("category"),
                 purpose=draft["purpose"],
                 reason=draft.get("reason"),
                 approved_by=draft["approved_by"],
                 remarks=draft.get("remarks") or None,
                 upi_reference_no=upi_reference_no,
-                payment_status=PAYMENT_STATUS_SUBMITTED,
+                payment_status=initial_status,
                 invoice_file=draft["invoice_file"],
                 payment_screenshot=screenshot_filename,
             )

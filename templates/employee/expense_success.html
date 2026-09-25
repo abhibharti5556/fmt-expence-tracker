@@ -1,5 +1,6 @@
 {% extends "layout_employee.html" %}
 {% import "partials/step_indicator.html" as si %}
+{% import "partials/macros.html" as m %}
 {% block title %}Expense Submitted{% endblock %}
 {% block page_title %}Expense Submitted{% endblock %}
 {% block page_subtitle %}<p>Your expense has been recorded successfully.</p>{% endblock %}
@@ -11,7 +12,11 @@
   <div class="card-fmt card-fmt-body text-center">
     <div class="success-check"><i class="ph ph-check-bold"></i></div>
     <h2 class="h5">Expense Submitted Successfully</h2>
+    {% if expense.payment_status == 'PENDING_APPROVAL' %}
+    <p class="text-muted-fmt">Your balance has been updated and this expense is now waiting on Admin approval.</p>
+    {% else %}
     <p class="text-muted-fmt">Your balance has been updated and this expense is now visible to Admin.</p>
+    {% endif %}
 
     <div class="summary-list text-start mt-4">
       <div class="summary-row total"><span class="label">Amount</span><span class="value">{{ expense.amount|inr }}</span></div>
@@ -19,9 +24,10 @@
       {% if expense.expense_type == 'LOGISTICS' %}
       <div class="summary-row"><span class="label">Docket</span><span class="value">{{ expense.docket_no }}</span></div>
       {% endif %}
+      <div class="summary-row"><span class="label">Category</span><span class="value">{{ expense.category }}</span></div>
       <div class="summary-row"><span class="label">Transaction ID</span><span class="value mono">{{ expense.transaction_id }}</span></div>
       <div class="summary-row"><span class="label">UPI Reference</span><span class="value mono">{{ expense.upi_reference_no }}</span></div>
-      <div class="summary-row"><span class="label">Status</span><span class="value">Submitted</span></div>
+      <div class="summary-row"><span class="label">Status</span><span class="value">{{ m.status_pill(expense.payment_status) }}</span></div>
     </div>
 
     <div class="d-flex flex-column gap-2 mt-4">

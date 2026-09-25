@@ -1,26 +1,113 @@
 {% extends "layout_admin.html" %}
-{% block title %}Admin Profile{% endblock %}
-{% block page_title %}Profile{% endblock %}
-{% block page_subtitle %}<p>Your administrator account details.</p>{% endblock %}
+{% block title %}My Profile{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+{% block page_subtitle %}<p>Manage your personal details and profile photo.</p>{% endblock %}
 
 {% block page_content %}
+
+{% if admin %}
+<div class="row g-4">
+  <div class="col-12 col-lg-7">
+    <div class="card-fmt card-fmt-body">
+      <form method="post" enctype="multipart/form-data" data-lock-submit novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt">Profile Photo</label>
+          <div class="avatar-upload">
+            {% if admin.profile_image %}
+              <img src="{{ url_for('auth.profile_image', filename=admin.profile_image) }}" alt="{{ admin.name }}" class="avatar-preview" id="avatarPreviewImg">
+            {% else %}
+              <span class="avatar-placeholder" id="avatarPreviewImg">{{ admin.name[:1]|upper }}</span>
+            {% endif %}
+            <div>
+              <label for="photo" class="btn-fmt btn-fmt-outline btn-fmt-sm" style="cursor:pointer;">
+                <i class="ph ph-camera"></i> Change Photo
+              </label>
+              <input type="file" id="photo" name="photo" accept=".jpg,.jpeg,.png,.webp" class="visually-hidden" data-avatar-preview="avatarPreviewImg">
+              <p class="form-hint mb-0">JPG, JPEG, PNG or WEBP.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt">Email</label>
+          <div class="field-locked">
+            {{ admin.email }}
+            <span class="lock-note"><i class="ph ph-lock-simple"></i> Used to log in</span>
+          </div>
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="name">Full Name<span class="required">*</span></label>
+          <input type="text" class="form-control-fmt" id="name" name="name" required
+                 value="{{ (form.name if form else admin.name) or '' }}">
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="mobile">Mobile Number</label>
+          <input type="tel" class="form-control-fmt" id="mobile" name="mobile"
+                 value="{{ (form.mobile if form else admin.mobile) or '' }}">
+        </div>
+
+        <button type="submit" class="btn-fmt btn-fmt-primary btn-fmt-lg">
+          <span class="btn-spinner"></span>
+          <span class="btn-label"><i class="ph ph-check"></i> Save Changes</span>
+        </button>
+      </form>
+
+      {% if admin.profile_image %}
+      <form method="post" action="{{ url_for('admin.admin_remove_photo') }}" class="mt-2" data-confirm="Remove your profile photo?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-fmt btn-fmt-ghost btn-fmt-sm"><i class="ph ph-trash"></i> Remove Photo</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card-fmt card-fmt-body">
+      <h2 class="h6 mb-3">Change Password</h2>
+      <form method="post" action="{{ url_for('admin.admin_change_password') }}" data-lock-submit novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="current_password">Current Password<span class="required">*</span></label>
+          <input type="password" class="form-control-fmt" id="current_password" name="current_password" required>
+        </div>
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="new_password">New Password<span class="required">*</span></label>
+          <input type="password" class="form-control-fmt" id="new_password" name="new_password" minlength="6" required>
+        </div>
+        <div class="form-group-fmt">
+          <label class="form-label-fmt" for="confirm_password">Confirm New Password<span class="required">*</span></label>
+          <input type="password" class="form-control-fmt" id="confirm_password" name="confirm_password" minlength="6" required>
+        </div>
+        <button type="submit" class="btn-fmt btn-fmt-outline btn-fmt-block">
+          <span class="btn-spinner"></span>
+          <span class="btn-label"><i class="ph ph-key"></i> Change Password</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% else %}
 <div class="container-narrow">
   <div class="card-fmt card-fmt-body text-center">
     <span class="avatar-placeholder mx-auto mb-3"><i class="ph ph-shield-check"></i></span>
-    <h2 class="h5 mb-0">Final Mile Techies</h2>
-    <p class="text-muted-fmt">Administrator</p>
+    <h2 class="h5 mb-0">{{ admin_username }}</h2>
+    <p class="text-muted-fmt">Administrator (legacy login)</p>
 
     <hr class="divider-fmt">
 
-    <div class="summary-list text-start">
-      <div class="summary-row"><span class="label">Username</span><span class="value">{{ admin_username }}</span></div>
-      <div class="summary-row"><span class="label">Company Name</span><span class="value">{{ company_name }}</span></div>
-      <div class="summary-row"><span class="label">Role</span><span class="value">Administrator</span></div>
-    </div>
-
-    <p class="form-hint mt-4 text-start">
-      <i class="ph ph-info"></i> Admin credentials and company UPI settings are configured securely via environment variables and are not editable here.
+    <p class="form-hint mt-2 text-start">
+      <i class="ph ph-info"></i> This session signed in with the shared .env admin credential, which has no
+      profile to edit. Go to <a href="{{ url_for('admin.admins') }}">Admins</a> to create a personal admin
+      account, then log in with it to manage your own name, mobile number and photo.
     </p>
   </div>
 </div>
+{% endif %}
+
 {% endblock %}

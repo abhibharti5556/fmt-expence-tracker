@@ -10,6 +10,18 @@
 
 <div class="container-medium">
 
+  {% if expense.payment_status == 'PENDING_APPROVAL' %}
+  <div class="inline-alert info mb-4">
+    <i class="ph ph-hourglass-medium"></i>
+    <div><strong>Waiting on Admin Approval</strong> This expense is reserved against your balance and will be reviewed by Admin shortly.</div>
+  </div>
+  {% elif expense.payment_status == 'REJECTED' %}
+  <div class="inline-alert error mb-4">
+    <i class="ph ph-x-circle"></i>
+    <div><strong>Rejected by Admin</strong> {{ expense.rejection_reason or 'No reason was provided.' }} Submit a new expense if the cost is still valid.</div>
+  </div>
+  {% endif %}
+
   <div class="card-fmt card-fmt-body mb-4">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
       <div>
@@ -32,8 +44,10 @@
     <div class="detail-grid">
       {% if expense.expense_type == 'LOGISTICS' %}
       <div class="detail-item"><div class="detail-label">Docket Number</div><div class="detail-value">{{ expense.docket_no or 'N/A' }}</div></div>
+      <div class="detail-item"><div class="detail-label">Category</div><div class="detail-value">{{ expense.category or 'N/A' }}</div></div>
       <div class="detail-item"><div class="detail-label">Purpose</div><div class="detail-value">{{ expense.purpose }}</div></div>
       {% else %}
+      <div class="detail-item"><div class="detail-label">Category</div><div class="detail-value">{{ expense.category or 'N/A' }}</div></div>
       <div class="detail-item"><div class="detail-label">Purpose</div><div class="detail-value">{{ expense.purpose }}</div></div>
       <div class="detail-item"><div class="detail-label">Why Required</div><div class="detail-value">{{ expense.reason or 'N/A' }}</div></div>
       {% endif %}

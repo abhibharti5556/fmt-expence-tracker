@@ -6,6 +6,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
+from models import PAYMENT_STATUS_LABELS
+
 BRAND_FILL = PatternFill(start_color="1B2130", end_color="1B2130", fill_type="solid")
 HEADER_FONT = Font(color="FFFFFF", bold=True, size=11)
 TITLE_FONT = Font(bold=True, size=14, color="1B2130")
@@ -107,9 +109,9 @@ def build_expense_report(expenses, from_date=None, to_date=None):
     ws2 = wb.create_sheet("Transactions")
     headers = [
         "Transaction ID", "Date", "Time", "Employee ID", "Employee Name",
-        "Expense Type", "Docket Number", "Amount", "Purpose", "Reason",
+        "Expense Type", "Docket Number", "Category", "Amount", "Purpose", "Reason",
         "Approved By", "Remarks", "UPI Reference Number", "Payment Status",
-        "Invoice File", "Payment Screenshot",
+        "Rejection Reason", "Invoice File", "Payment Screenshot",
     ]
     for idx, header in enumerate(headers, start=1):
         ws2.cell(row=1, column=idx, value=header)
@@ -125,19 +127,21 @@ def build_expense_report(expenses, from_date=None, to_date=None):
             e.user.name,
             e.expense_type.title(),
             e.docket_no or "N/A",
+            e.category or "N/A",
             float(e.amount),
             e.purpose,
             e.reason or "N/A",
             e.approved_by,
             e.remarks or "",
             e.upi_reference_no,
-            e.payment_status.title(),
+            PAYMENT_STATUS_LABELS.get(e.payment_status, e.payment_status),
+            e.rejection_reason or "",
             e.invoice_file,
             e.payment_screenshot,
         ]
         for c_idx, val in enumerate(values, start=1):
             cell = ws2.cell(row=r_idx, column=c_idx, value=val)
-            if c_idx == 8:
+            if c_idx == 9:
                 cell.number_format = CURRENCY_FORMAT
 
     last_col = get_column_letter(len(headers))

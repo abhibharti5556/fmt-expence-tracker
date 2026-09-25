@@ -39,6 +39,25 @@
         <select class="form-select-fmt" name="status">
           <option value="">All Statuses</option>
           <option value="SUBMITTED" {{ 'selected' if args.get('status') == 'SUBMITTED' }}>Submitted</option>
+          <option value="PENDING_APPROVAL" {{ 'selected' if args.get('status') == 'PENDING_APPROVAL' }}>Pending Approval</option>
+          <option value="APPROVED" {{ 'selected' if args.get('status') == 'APPROVED' }}>Approved</option>
+          <option value="REJECTED" {{ 'selected' if args.get('status') == 'REJECTED' }}>Rejected</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label-fmt">Category</label>
+        <select class="form-select-fmt" name="category">
+          <option value="">All Categories</option>
+          <optgroup label="Logistics">
+            {% for c in logistics_categories %}
+            <option value="{{ c }}" {{ 'selected' if args.get('category') == c }}>{{ c }}</option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="Warehousing">
+            {% for c in warehousing_categories %}
+            <option value="{{ c }}" {{ 'selected' if args.get('category') == c }}>{{ c }}</option>
+            {% endfor %}
+          </optgroup>
         </select>
       </div>
     </div>

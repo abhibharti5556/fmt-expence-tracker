@@ -21,8 +21,10 @@
 
       {% if draft.expense_type == 'LOGISTICS' %}
       <div class="summary-row"><span class="label">Docket No.</span><span class="value">{{ draft.docket_no }}</span></div>
+      <div class="summary-row"><span class="label">Category</span><span class="value">{{ draft.category }}</span></div>
       <div class="summary-row"><span class="label">Purpose</span><span class="value">{{ draft.purpose }}</span></div>
       {% else %}
+      <div class="summary-row"><span class="label">Category</span><span class="value">{{ draft.category }}</span></div>
       <div class="summary-row"><span class="label">Purpose</span><span class="value">{{ draft.purpose }}</span></div>
       <div class="summary-row"><span class="label">Why Required</span><span class="value">{{ draft.reason }}</span></div>
       {% endif %}

@@ -5,7 +5,7 @@ from flask import (
     current_app, send_from_directory,
 )
 
-from models import User
+from models import User, AdminUser
 from utils.decorators import login_required
 from utils.helpers import delete_uploaded_file
 from utils.rate_limit import is_locked_out, record_failure, record_success
@@ -49,11 +49,11 @@ def admin_login():
         return redirect(url_for("admin.dashboard"))
 
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
         password = request.form.get("password", "")
         ip = _client_ip()
 
-        remaining = is_locked_out("ADMIN", username or "admin", ip)
+        remaining = is_locked_out("ADMIN", email or "admin", ip)
         if remaining is not None:
             flash(
                 f"Too many failed attempts. Try again in {int(remaining // 60) + 1} minute(s).",
@@ -61,28 +61,42 @@ def admin_login():
             )
             return render_template("auth/admin_login.html")
 
-        valid_username = secrets.compare_digest(username, current_app.config["ADMIN_USERNAME"])
-        valid_password = secrets.compare_digest(password, current_app.config["ADMIN_PASSWORD"])
+        admin = AdminUser.query.filter(AdminUser.email.ilike(email)).first() if email else None
 
-        if valid_username and valid_password:
-            record_success("ADMIN", username, ip)
+        if admin and admin.is_active() and admin.check_password(password):
+            record_success("ADMIN", email, ip)
             session.clear()
             session.permanent = True
             session["role"] = "ADMIN"
-            session["username"] = username
+            session["admin_id"] = admin.id
+            session["username"] = admin.name
+            flash(f"Welcome back, {admin.name}.", "success")
+            return redirect(url_for("admin.dashboard"))
+
+        # Bootstrap path: lets the very first admin account be created via
+        # the "Manage Admins" screen before any AdminUser rows exist yet.
+        # Drop this once real admin accounts are confirmed working.
+        valid_username = secrets.compare_digest(email, current_app.config["ADMIN_USERNAME"])
+        valid_password = secrets.compare_digest(password, current_app.config["ADMIN_PASSWORD"])
+        if valid_username and valid_password:
+            record_success("ADMIN", email, ip)
+            session.clear()
+            session.permanent = True
+            session["role"] = "ADMIN"
+            session["username"] = email
             flash("Welcome back, Admin.", "success")
             return redirect(url_for("admin.dashboard"))
 
         max_attempts, window_minutes, lockout_minutes = _lockout_config()
         locked = record_failure(
-            "ADMIN", username or "admin", ip, max_attempts, window_minutes, lockout_minutes
+            "ADMIN", email or "admin", ip, max_attempts, window_minutes, lockout_minutes
         )
         if locked:
             flash(
                 f"Too many failed attempts. Try again in {lockout_minutes} minute(s).", "error"
             )
         else:
-            flash("Invalid username or password.", "error")
+            flash("Invalid email or password.", "error")
 
     return render_template("auth/admin_login.html")
 

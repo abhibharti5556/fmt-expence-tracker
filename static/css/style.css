@@ -633,6 +633,71 @@ textarea.form-control-fmt { min-height: 90px; resize: vertical; }
   margin-top: 4px;
 }
 
+/* ---------------------------------------------------------------------- */
+/* Category picker (visual radio-card grid)                                */
+/* ---------------------------------------------------------------------- */
+
+.category-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 10px;
+}
+
+.category-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.category-card input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.category-card i {
+  font-size: 1.4rem;
+  color: var(--color-text-muted);
+  transition: color var(--transition-fast);
+}
+
+.category-card span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-text-secondary);
+}
+
+.category-card:hover { border-color: var(--color-brand); }
+
+.category-card:has(input:focus-visible) {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px rgba(242, 166, 29, 0.18);
+}
+
+.category-card.selected {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.category-card.selected i,
+.category-card.selected span {
+  color: var(--color-brand-text);
+}
+
 /* Read-only / locked field (Employee ID) */
 .field-locked {
   display: flex;

@@ -19,12 +19,19 @@
     </a>
     <a href="{{ url_for('admin.expenses') }}" class="sidebar-link {{ 'active' if request.endpoint in ['admin.expenses','admin.expense_detail'] }}">
       <i class="ph ph-receipt"></i> Expenses
+      {% if sidebar_pending_approvals %}<span class="pill pill-warning" style="margin-left:auto;">{{ sidebar_pending_approvals }}</span>{% endif %}
     </a>
     <a href="{{ url_for('admin.analytics') }}" class="sidebar-link {{ 'active' if request.endpoint == 'admin.analytics' }}">
       <i class="ph ph-chart-line-up"></i> Employee Analytics
     </a>
     <a href="{{ url_for('admin.reports') }}" class="sidebar-link {{ 'active' if request.endpoint in ['admin.reports'] }}">
       <i class="ph ph-file-xls"></i> Reports
+    </a>
+    <a href="{{ url_for('admin.admins') }}" class="sidebar-link {{ 'active' if request.endpoint in ['admin.admins','admin.add_admin','admin.admin_detail','admin.edit_admin'] }}">
+      <i class="ph ph-shield-check"></i> Admins
+    </a>
+    <a href="{{ url_for('admin.activity_log') }}" class="sidebar-link {{ 'active' if request.endpoint == 'admin.activity_log' }}">
+      <i class="ph ph-clock-counter-clockwise"></i> Activity Log
     </a>
   </nav>
 

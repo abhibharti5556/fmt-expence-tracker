@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", function () {
   initPasswordToggles();
   initSubmitLock();
   initConfirmDialogs();
+  initCategoryPickers();
 });
 
 // ---------------------------------------------------------------------------
@@ -203,6 +204,23 @@ function initConfirmDialogs() {
       if (!confirm(message)) {
         e.preventDefault();
       }
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Category picker (visual radio-card grid)
+// ---------------------------------------------------------------------------
+function initCategoryPickers() {
+  document.querySelectorAll(".category-picker").forEach(function (picker) {
+    var cards = picker.querySelectorAll(".category-card");
+    cards.forEach(function (card) {
+      var input = card.querySelector("input[type=radio]");
+      input.addEventListener("change", function () {
+        cards.forEach(function (c) { c.classList.remove("selected"); });
+        card.classList.add("selected");
+        card.dispatchEvent(new Event("category-picker:change", { bubbles: true }));
+      });
     });
   });
 }

@@ -1,0 +1,81 @@
+{% extends "layout_admin.html" %}
+{% block title %}{{ 'Add Admin' if mode == 'add' else 'Edit Admin' }}{% endblock %}
+{% block page_title %}{{ 'Add Admin' if mode == 'add' else 'Edit Admin' }}{% endblock %}
+{% block page_subtitle %}<p>{{ 'Create a new admin account.' if mode == 'add' else 'Update admin account details.' }}</p>{% endblock %}
+
+{% block page_content %}
+<div class="container-narrow">
+  <div class="card-fmt card-fmt-body">
+    <form method="post" data-lock-submit novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-group-fmt">
+        <label class="form-label-fmt" for="name">Name<span class="required">*</span></label>
+        <input type="text" class="form-control-fmt" id="name" name="name" required
+               value="{{ (form.name if form else target.name) or '' }}">
+      </div>
+
+      {% if mode == 'add' %}
+      <div class="form-group-fmt">
+        <label class="form-label-fmt" for="email">Email<span class="required">*</span></label>
+        <input type="email" class="form-control-fmt" id="email" name="email" required
+               value="{{ form.email or '' }}">
+        <p class="form-hint">This is permanent once created — it cannot be changed later.</p>
+      </div>
+      {% else %}
+      <div class="form-group-fmt">
+        <label class="form-label-fmt">Email</label>
+        <div class="field-locked">
+          {{ target.email }}
+          <span class="lock-note"><i class="ph ph-lock-simple"></i> Fixed</span>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="form-group-fmt">
+        <label class="form-label-fmt" for="mobile">Mobile Number</label>
+        <input type="tel" class="form-control-fmt" id="mobile" name="mobile"
+               value="{{ (form.mobile if form else target.mobile) or '' }}">
+      </div>
+
+      {% if mode == 'add' %}
+      <div class="row g-3">
+        <div class="col-12 col-sm-6">
+          <div class="form-group-fmt">
+            <label class="form-label-fmt" for="password">Password<span class="required">*</span></label>
+            <div class="password-field">
+              <input type="password" class="form-control-fmt" id="password" name="password" required minlength="6">
+              <button type="button" class="password-toggle" data-password-toggle="password" aria-label="Show password"><i class="ph ph-eye"></i></button>
+            </div>
+            <p class="form-hint">Minimum 6 characters.</p>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6">
+          <div class="form-group-fmt">
+            <label class="form-label-fmt" for="confirm_password">Confirm Password<span class="required">*</span></label>
+            <input type="password" class="form-control-fmt" id="confirm_password" name="confirm_password" required minlength="6">
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="form-group-fmt">
+        <label class="form-label-fmt" for="status">Status</label>
+        <select class="form-select-fmt" id="status" name="status">
+          {% set current_status = (form.status if form else target.status) or 'Active' %}
+          <option value="Active" {{ 'selected' if current_status == 'Active' }}>Active</option>
+          <option value="Inactive" {{ 'selected' if current_status == 'Inactive' }}>Inactive</option>
+        </select>
+      </div>
+      {% endif %}
+
+      <div class="d-flex gap-2 mt-4 flex-wrap">
+        <button type="submit" class="btn-fmt btn-fmt-primary btn-fmt-lg">
+          <span class="btn-spinner"></span>
+          <span class="btn-label"><i class="ph ph-check"></i> {{ 'Create Admin' if mode == 'add' else 'Save Changes' }}</span>
+        </button>
+        <a href="{{ url_for('admin.admins') if mode == 'add' else url_for('admin.admin_detail', admin_id=target.id) }}" class="btn-fmt btn-fmt-outline btn-fmt-lg">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

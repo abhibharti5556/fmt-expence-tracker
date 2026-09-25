@@ -1,0 +1,79 @@
+{% extends "layout_admin.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}Activity Log{% endblock %}
+{% block page_title %}Activity Log{% endblock %}
+{% block page_subtitle %}<p>Every action taken by an admin account.</p>{% endblock %}
+
+{% block page_content %}
+
+<div class="filter-bar">
+  <form method="get">
+    <div class="filter-grid">
+      <div>
+        <label class="form-label-fmt">From Date</label>
+        <input type="date" class="form-control-fmt" name="from_date" value="{{ args.get('from_date','') }}">
+      </div>
+      <div>
+        <label class="form-label-fmt">To Date</label>
+        <input type="date" class="form-control-fmt" name="to_date" value="{{ args.get('to_date','') }}">
+      </div>
+      <div>
+        <label class="form-label-fmt">Admin</label>
+        <input type="text" class="form-control-fmt" name="admin" value="{{ args.get('admin','') }}" placeholder="Admin name">
+      </div>
+      <div>
+        <label class="form-label-fmt">Action</label>
+        <select class="form-select-fmt" name="action">
+          <option value="">All Actions</option>
+          {% for a in actions %}
+          <option value="{{ a }}" {{ 'selected' if args.get('action') == a }}>{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="filter-actions mt-3">
+      <button type="submit" class="btn-fmt btn-fmt-primary"><i class="ph ph-funnel"></i> Apply Filters</button>
+      <a href="{{ url_for('admin.activity_log') }}" class="btn-fmt btn-fmt-outline">Reset</a>
+    </div>
+  </form>
+</div>
+
+<div class="card-fmt">
+  {% if logs %}
+  <div class="table-fmt-wrap">
+    <table class="table-fmt">
+      <thead>
+        <tr><th>Date</th><th>Admin</th><th>Action</th><th>Detail</th><th>Related</th></tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td>{{ log.created_at.strftime('%d %b %Y, %I:%M %p') }}</td>
+          <td>{{ log.admin_username }}</td>
+          <td>{{ log.action }}</td>
+          <td>{{ log.detail or '—' }}</td>
+          <td>
+            {% if log.target_expense %}
+            <a href="{{ url_for('admin.expense_detail', expense_id=log.target_expense.id) }}" class="btn-fmt btn-fmt-ghost btn-fmt-sm">
+              <i class="ph ph-receipt"></i> {{ log.target_expense.transaction_id }}
+            </a>
+            {% elif log.target_user %}
+            <a href="{{ url_for('admin.employee_detail', user_id=log.target_user.id) }}" class="btn-fmt btn-fmt-ghost btn-fmt-sm">
+              <i class="ph ph-user"></i> {{ log.target_user.employee_id }}
+            </a>
+            {% else %}
+            —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ m.render_pagination(pagination, 'admin.activity_log') }}
+  {% else %}
+  {{ m.empty_state('ph-clock-counter-clockwise', 'No activity yet', 'Admin actions will appear here as they happen.') }}
+  {% endif %}
+</div>
+
+{% endblock %}

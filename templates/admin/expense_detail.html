@@ -34,6 +34,37 @@
       </div>
     </div>
 
+    {% if expense.payment_status == 'PENDING_APPROVAL' %}
+    <div class="card-fmt card-fmt-body mb-4">
+      <h3 class="h6 mb-3"><i class="ph ph-hourglass-medium"></i> Awaiting Your Approval</h3>
+      <p class="text-muted-fmt mb-3">This expense is reserved against the employee's balance. Approve it once verified, or reject it with a reason.</p>
+      <div class="d-flex flex-wrap gap-3">
+        <form method="post" action="{{ url_for('admin.expense_approve', expense_id=expense.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-fmt btn-fmt-primary"><i class="ph ph-check-circle"></i> Approve</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.expense_reject', expense_id=expense.id) }}" class="d-flex flex-wrap gap-2 align-items-start flex-grow-1">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="text" class="form-control-fmt" name="rejection_reason" placeholder="Reason for rejection" required style="min-width:220px;">
+          <button type="submit" class="btn-fmt btn-fmt-outline"><i class="ph ph-x-circle"></i> Reject</button>
+        </form>
+      </div>
+    </div>
+    {% elif expense.payment_status == 'REJECTED' %}
+    <div class="inline-alert error mb-4">
+      <i class="ph ph-x-circle"></i>
+      <div>
+        <strong>Rejected{{ ' by ' + expense.reviewed_by if expense.reviewed_by }}</strong>
+        {{ expense.rejection_reason or 'No reason was provided.' }}
+      </div>
+    </div>
+    {% elif expense.payment_status == 'APPROVED' and expense.reviewed_by %}
+    <div class="inline-alert success mb-4">
+      <i class="ph ph-check-circle"></i>
+      <div><strong>Approved by {{ expense.reviewed_by }}</strong> {{ expense.reviewed_at.strftime('%d %b %Y, %I:%M %p') if expense.reviewed_at }}</div>
+    </div>
+    {% endif %}
+
     <div class="card-fmt card-fmt-body mb-4">
       <h3 class="h6 mb-3">Expense Information</h3>
       <div class="detail-grid">
@@ -47,10 +78,18 @@
           <div class="detail-value">{{ expense.docket_no or 'N/A' }}</div>
         </div>
         <div class="detail-item">
+          <div class="detail-label">Category</div>
+          <div class="detail-value">{{ expense.category or 'N/A' }}</div>
+        </div>
+        <div class="detail-item">
           <div class="detail-label">Purpose</div>
           <div class="detail-value">{{ expense.purpose }}</div>
         </div>
         {% else %}
+        <div class="detail-item">
+          <div class="detail-label">Category</div>
+          <div class="detail-value">{{ expense.category or 'N/A' }}</div>
+        </div>
         <div class="detail-item">
           <div class="detail-label">Purpose</div>
           <div class="detail-value">{{ expense.purpose }}</div>
@@ -125,6 +164,29 @@
         </div>
       </div>
     </div>
+
+    {% if logs %}
+    <div class="card-fmt card-fmt-body mt-4">
+      <h3 class="h6 mb-3">Activity on This Expense</h3>
+      <div class="table-fmt-wrap">
+        <table class="table-fmt">
+          <thead>
+            <tr><th>Date</th><th>Admin</th><th>Action</th><th>Detail</th></tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+            <tr>
+              <td>{{ log.created_at.strftime('%d %b %Y, %I:%M %p') }}</td>
+              <td>{{ log.admin_username }}</td>
+              <td>{{ log.action }}</td>
+              <td>{{ log.detail or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
 
   </div>
 

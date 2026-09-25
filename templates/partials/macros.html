@@ -57,6 +57,12 @@
 {% macro status_pill(status) %}
   {% if status == 'SUBMITTED' %}
     <span class="pill pill-success"><i class="ph ph-check-circle"></i> Submitted</span>
+  {% elif status == 'PENDING_APPROVAL' %}
+    <span class="pill pill-warning"><i class="ph ph-hourglass-medium"></i> Pending Approval</span>
+  {% elif status == 'APPROVED' %}
+    <span class="pill pill-success"><i class="ph ph-check-circle"></i> Approved</span>
+  {% elif status == 'REJECTED' %}
+    <span class="pill pill-error"><i class="ph ph-x-circle"></i> Rejected</span>
   {% elif status == 'Active' %}
     <span class="pill pill-success"><i class="ph ph-check-circle"></i> Active</span>
   {% elif status == 'Inactive' %}
@@ -72,6 +78,18 @@
   {% else %}
     <span class="type-tag warehousing"><i class="ph ph-warehouse"></i> Warehousing</span>
   {% endif %}
+{% endmacro %}
+
+{% macro category_picker(categories, icons, selected, name='category') %}
+<div class="category-picker">
+  {% for c in categories %}
+  <label class="category-card {{ 'selected' if selected == c }}">
+    <input type="radio" name="{{ name }}" value="{{ c }}" {{ 'checked' if selected == c }} required>
+    <i class="ph {{ icons.get(c, 'ph-tag') }}" aria-hidden="true"></i>
+    <span>{{ c }}</span>
+  </label>
+  {% endfor %}
+</div>
 {% endmacro %}
 
 {% macro avatar(user, size='sm') %}

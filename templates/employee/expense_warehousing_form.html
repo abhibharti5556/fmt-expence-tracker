@@ -1,5 +1,6 @@
 {% extends "layout_employee.html" %}
 {% import "partials/step_indicator.html" as si %}
+{% import "partials/macros.html" as m %}
 {% block title %}Warehousing Expense{% endblock %}
 {% block page_title %}Warehousing Expense{% endblock %}
 {% block page_subtitle %}<p>Fill in the details of your warehousing expense.</p>{% endblock %}
@@ -23,6 +24,11 @@
                    value="{{ form.amount or '' }}">
           </div>
           <p class="form-hint">Available balance: {{ balance|inr }}</p>
+        </div>
+
+        <div class="form-group-fmt">
+          <label class="form-label-fmt">Expense Category<span class="required">*</span></label>
+          {{ m.category_picker(categories, icons, form.category) }}
         </div>
 
         <div class="form-group-fmt">

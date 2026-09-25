@@ -39,6 +39,25 @@
         <select class="form-select-fmt" name="status">
           <option value="">All Statuses</option>
           <option value="SUBMITTED" {{ 'selected' if args.get('status') == 'SUBMITTED' }}>Submitted</option>
+          <option value="PENDING_APPROVAL" {{ 'selected' if args.get('status') == 'PENDING_APPROVAL' }}>Pending Approval</option>
+          <option value="APPROVED" {{ 'selected' if args.get('status') == 'APPROVED' }}>Approved</option>
+          <option value="REJECTED" {{ 'selected' if args.get('status') == 'REJECTED' }}>Rejected</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label-fmt">Category</label>
+        <select class="form-select-fmt" name="category">
+          <option value="">All Categories</option>
+          <optgroup label="Logistics">
+            {% for c in logistics_categories %}
+            <option value="{{ c }}" {{ 'selected' if args.get('category') == c }}>{{ c }}</option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="Warehousing">
+            {% for c in warehousing_categories %}
+            <option value="{{ c }}" {{ 'selected' if args.get('category') == c }}>{{ c }}</option>
+            {% endfor %}
+          </optgroup>
         </select>
       </div>
       <div>
@@ -60,7 +79,7 @@
     <table class="table-fmt">
       <thead>
         <tr>
-          <th>Date</th><th>Transaction ID</th><th>Employee</th><th>Type</th><th>Docket No.</th>
+          <th>Date</th><th>Transaction ID</th><th>Employee</th><th>Type</th><th>Docket No.</th><th>Category</th>
           <th class="num">Amount</th><th>Purpose</th><th>Approved By</th><th>UPI Ref</th><th>Status</th><th>Details</th>
         </tr>
       </thead>
@@ -72,6 +91,7 @@
           <td><span class="employee-id-badge">{{ e.user.employee_id }}</span> {{ e.user.name }}</td>
           <td>{{ m.type_tag(e.expense_type) }}</td>
           <td>{{ e.docket_no or 'N/A' }}</td>
+          <td>{{ e.category or 'N/A' }}</td>
           <td class="num mono">{{ e.amount|inr }}</td>
           <td>{{ e.purpose }}</td>
           <td>{{ e.approved_by }}</td>

@@ -1,0 +1,56 @@
+{% extends "layout_admin.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}Admins{% endblock %}
+{% block page_title %}Admins{% endblock %}
+{% block page_subtitle %}<p>Manage who can sign in to the admin side.</p>{% endblock %}
+
+{% block page_content %}
+
+<div class="section-heading">
+  <div></div>
+  <a href="{{ url_for('admin.add_admin') }}" class="btn-fmt btn-fmt-primary">
+    <i class="ph ph-user-plus"></i> Add Admin
+  </a>
+</div>
+
+<div class="card-fmt">
+  {% if rows %}
+  <div class="table-fmt-wrap">
+    <table class="table-fmt">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Mobile</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for admin in rows %}
+        <tr>
+          <td>{{ m.avatar(admin, 'sm') }}</td>
+          <td>{{ admin.name }}</td>
+          <td>{{ admin.email }}</td>
+          <td>{{ admin.mobile or 'N/A' }}</td>
+          <td>{{ m.status_pill(admin.status) }}</td>
+          <td>{{ admin.created_at.strftime('%d %b %Y') }}</td>
+          <td>
+            <div class="d-flex gap-2 flex-wrap">
+              <a href="{{ url_for('admin.admin_detail', admin_id=admin.id) }}" class="btn-fmt btn-fmt-ghost btn-fmt-sm" title="View"><i class="ph ph-eye"></i></a>
+              <a href="{{ url_for('admin.edit_admin', admin_id=admin.id) }}" class="btn-fmt btn-fmt-ghost btn-fmt-sm" title="Edit"><i class="ph ph-pencil-simple"></i></a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ m.empty_state('ph-shield-check', 'No admin accounts yet', 'Add your first admin account.', url_for('admin.add_admin'), 'Add Admin') }}
+  {% endif %}
+</div>
+
+{% endblock %}

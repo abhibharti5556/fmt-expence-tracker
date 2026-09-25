@@ -12,12 +12,107 @@ TRANSACTION_TYPE_CREDIT = "CREDIT"
 EXPENSE_TYPE_LOGISTICS = "LOGISTICS"
 EXPENSE_TYPE_WAREHOUSING = "WAREHOUSING"
 
-# The only payment_status value the app ever writes today. Kept as a plain
-# string column (not a DB enum) so future statuses (e.g. VERIFIED/REJECTED)
-# can be introduced without a migration. This is the single status that
-# counts toward balance, KPIs, and reports everywhere in the app.
+# Fixed category list shown on the Logistics expense form. Kept as a plain
+# list (not a DB enum) so adding/renaming a category is a code change, not
+# a migration; the `category` column just stores whichever string was
+# selected at submission time.
+LOGISTICS_CATEGORIES = [
+    "Pickup",
+    "Re-packing",
+    "Manpower",
+    "Halting",
+    "Adhoc Vehicle Charges",
+    "Parking",
+    "Mathadi",
+    "Loading",
+    "Unloading",
+    "Others",
+]
+
+# Icon shown on the category picker card. Falls back to a generic tag icon
+# in the template if a category is missing here.
+LOGISTICS_CATEGORY_ICONS = {
+    "Pickup": "ph-truck",
+    "Re-packing": "ph-package",
+    "Manpower": "ph-users-three",
+    "Halting": "ph-hourglass-medium",
+    "Adhoc Vehicle Charges": "ph-car",
+    "Parking": "ph-map-pin",
+    "Mathadi": "ph-hand-fist",
+    "Loading": "ph-tray-arrow-down",
+    "Unloading": "ph-tray-arrow-up",
+    "Others": "ph-dots-three-circle",
+}
+
+# Fixed category list shown on the Warehousing expense form. Same reasoning
+# as LOGISTICS_CATEGORIES above.
+WAREHOUSING_CATEGORIES = [
+    "Rent",
+    "Property Tax",
+    "Facility Insurance",
+    "Maintenance",
+    "Utilities",
+    "Janitorial",
+    "Housekeeping",
+    "Pantry",
+    "Security",
+    "Direct Labor",
+    "Equipment Repair",
+    "Equipment Fuel",
+    "Labels",
+    "Safety Gear",
+    "IT Hardware",
+    "Internet & Wi-Fi",
+    "Others",
+]
+
+WAREHOUSING_CATEGORY_ICONS = {
+    "Rent": "ph-key",
+    "Property Tax": "ph-bank",
+    "Facility Insurance": "ph-shield-check",
+    "Maintenance": "ph-wrench",
+    "Utilities": "ph-lightning",
+    "Janitorial": "ph-broom",
+    "Housekeeping": "ph-house-line",
+    "Pantry": "ph-coffee",
+    "Security": "ph-shield",
+    "Direct Labor": "ph-users-three",
+    "Equipment Repair": "ph-wrench",
+    "Equipment Fuel": "ph-gas-pump",
+    "Labels": "ph-tag",
+    "Safety Gear": "ph-hard-hat",
+    "IT Hardware": "ph-desktop-tower",
+    "Internet & Wi-Fi": "ph-wifi-high",
+    "Others": "ph-dots-three-circle",
+}
+
+# Kept as plain string columns (not a DB enum) so new statuses can be
+# introduced without a migration.
+#
+# Logistics expenses go SUBMITTED-equivalent (PENDING_APPROVAL) at
+# creation, then an admin moves them to APPROVED or REJECTED. Warehousing
+# expenses still go straight to SUBMITTED (no approval step).
+#
+# Balance/KPI/report totals reserve the amount as soon as it's submitted,
+# not just once approved -- an employee's balance drops immediately and
+# only comes back if the entry is REJECTED. That's why PENDING_APPROVAL
+# and APPROVED both count here, alongside the original SUBMITTED.
 PAYMENT_STATUS_SUBMITTED = "SUBMITTED"
-BALANCE_COUNTING_STATUSES = (PAYMENT_STATUS_SUBMITTED,)
+PAYMENT_STATUS_PENDING_APPROVAL = "PENDING_APPROVAL"
+PAYMENT_STATUS_APPROVED = "APPROVED"
+PAYMENT_STATUS_REJECTED = "REJECTED"
+BALANCE_COUNTING_STATUSES = (
+    PAYMENT_STATUS_SUBMITTED,
+    PAYMENT_STATUS_PENDING_APPROVAL,
+    PAYMENT_STATUS_APPROVED,
+)
+
+PAYMENT_STATUS_LABELS = {
+    PAYMENT_STATUS_SUBMITTED: "Submitted",
+    PAYMENT_STATUS_PENDING_APPROVAL: "Pending Approval",
+    PAYMENT_STATUS_APPROVED: "Approved",
+    PAYMENT_STATUS_REJECTED: "Rejected",
+}
 
 
 class User(db.Model):
@@ -85,6 +180,7 @@ class Expense(db.Model):
     amount = db.Column(db.Numeric(12, 2), nullable=False)
 
     docket_no = db.Column(db.String(60), nullable=True)
+    category = db.Column(db.String(50), nullable=True)
     purpose = db.Column(db.String(255), nullable=False)
     reason = db.Column(db.String(500), nullable=True)
     approved_by = db.Column(db.String(120), nullable=False)
@@ -92,6 +188,9 @@ class Expense(db.Model):
 
     upi_reference_no = db.Column(db.String(60), nullable=False)
     payment_status = db.Column(db.String(20), nullable=False, default=PAYMENT_STATUS_SUBMITTED)
+    rejection_reason = db.Column(db.String(500), nullable=True)
+    reviewed_by = db.Column(db.String(120), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
 
     invoice_file = db.Column(db.String(255), nullable=False)
     payment_screenshot = db.Column(db.String(255), nullable=False)
