@@ -1,4 +1,6 @@
 import os
+from datetime import timedelta
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -33,3 +35,20 @@ class Config:
     ITEMS_PER_PAGE = 20
 
     FLASK_DEBUG = os.environ.get("FLASK_DEBUG", "False") == "True"
+
+    # Idle sessions expire after this many hours; refreshed on each request
+    # (Flask's default SESSION_REFRESH_EACH_REQUEST) so an active user is
+    # never logged out mid-work, only after real inactivity.
+    PERMANENT_SESSION_LIFETIME = timedelta(
+        hours=int(os.environ.get("SESSION_LIFETIME_HOURS", "8"))
+    )
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    # Set SESSION_COOKIE_SECURE=True in .env once the app is served over
+    # HTTPS. Left False by default so local HTTP dev keeps working.
+    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "False") == "True"
+
+    # Failed-login lockout (see utils/rate_limit.py)
+    LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
+    LOGIN_ATTEMPT_WINDOW_MINUTES = int(os.environ.get("LOGIN_ATTEMPT_WINDOW_MINUTES", "10"))
+    LOGIN_LOCKOUT_MINUTES = int(os.environ.get("LOGIN_LOCKOUT_MINUTES", "15"))

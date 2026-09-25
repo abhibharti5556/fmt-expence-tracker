@@ -25,6 +25,15 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MOBILE_RE = re.compile(r"^\+?\d{10,15}$")
 
 
+def _discard_draft_invoice():
+    """Delete the invoice file attached to the in-progress draft, if any.
+    Called whenever a draft is abandoned or overwritten before it becomes
+    a real Expense row, so uploads don't pile up on disk unreferenced."""
+    draft = session.get("expense_draft")
+    if draft and draft.get("invoice_file"):
+        delete_uploaded_file(current_app.config["INVOICE_FOLDER"], draft["invoice_file"])
+
+
 # ---------------------------------------------------------------------------
 # Dashboard
 # ---------------------------------------------------------------------------
@@ -208,6 +217,7 @@ def expense_screenshot(expense_id):
 @employee_bp.route("/expense/new")
 @employee_required
 def expense_new():
+    _discard_draft_invoice()
     session.pop("expense_draft", None)
     return render_template("employee/expense_new.html", balance=get_employee_balance(current_employee().id))
 
@@ -240,6 +250,16 @@ def expense_logistics():
 
         if not docket_no:
             errors.append("Docket Number is required.")
+        else:
+            duplicate = Expense.query.filter(
+                Expense.docket_no.isnot(None),
+                Expense.docket_no.ilike(docket_no),
+            ).first()
+            if duplicate:
+                errors.append(
+                    f"Docket Number '{docket_no}' was already used in expense "
+                    f"{duplicate.transaction_id}. Please check before submitting again."
+                )
         if not purpose:
             errors.append("Purpose of Payment is required.")
         if not approved_by:
@@ -260,6 +280,7 @@ def expense_logistics():
             invoice, current_app.config["INVOICE_FOLDER"], prefix=f"{user.employee_id}_"
         )
 
+        _discard_draft_invoice()
         session["expense_draft"] = {
             "expense_type": EXPENSE_TYPE_LOGISTICS,
             "amount": str(amount),
@@ -325,6 +346,7 @@ def expense_warehousing():
             invoice, current_app.config["INVOICE_FOLDER"], prefix=f"{user.employee_id}_"
         )
 
+        _discard_draft_invoice()
         session["expense_draft"] = {
             "expense_type": EXPENSE_TYPE_WAREHOUSING,
             "amount": str(amount),

@@ -8,6 +8,73 @@ for anything that belongs there instead.
 
 ---
 
+## 2026-09-20 (latest) — Implementation pass on the Priority 1 doc-review findings
+
+Implemented most of `task.md`'s Priority 1 list, plus the code-safe parts
+of Priority 2, against the real codebase (not just docs this time).
+git was initialized first (baseline commit `ccebc59`) specifically because
+this pass touches auth/session behavior and adds new files — the user
+confirmed they wanted a rollback point before starting.
+
+**What changed, by file:**
+- `app.py` — `_configure_sqlite_locking()`: SQLite engine now issues
+  `BEGIN IMMEDIATE` on every transaction + `PRAGMA busy_timeout=5000`.
+  This closes the balance-check race identified in the doc review
+  without any app-level locking code, because SQLite's single-writer
+  lock does the serialization once it's taken at transaction start
+  instead of at first write. Also added `create_app(test_config=None)`
+  so the test suite can point at an isolated DB.
+- `config.py` — `PERMANENT_SESSION_LIFETIME`, `SESSION_COOKIE_HTTPONLY`,
+  `SESSION_COOKIE_SAMESITE`, `SESSION_COOKIE_SECURE` (env-toggle),
+  `LOGIN_MAX_ATTEMPTS`/`LOGIN_ATTEMPT_WINDOW_MINUTES`/`LOGIN_LOCKOUT_MINUTES`.
+- `utils/rate_limit.py` (new) — in-memory failed-login tracker, wired
+  into both login routes in `routes/auth.py`. Deliberately simple (dict +
+  lock, not Redis/DB) since the app is single-process; flagged in
+  `task.md` as something to revisit only if the app becomes multi-worker.
+- `models/audit.py` (new) — `AdminAuditLog` + `log_admin_action()`.
+  Wired into `routes/admin.py` for employee create/edit/password-reset/
+  status-toggle. New table, created automatically by the existing
+  `db.create_all()` — confirmed via `sqlite3` that `admin_audit_log` now
+  exists in `instance/expenses.db` alongside the original three tables,
+  with no changes to those three.
+- `routes/employee.py` — Docket Number duplicate check (app-level query,
+  case-insensitive) in the Logistics form handler. Also added
+  `_discard_draft_invoice()`, called from `expense_new()` and both form
+  handlers, so abandoning or overwriting a draft deletes its orphaned
+  invoice file. `routes/auth.py: logout()` does the same.
+- `scripts/cleanup_orphaned_uploads.py` (new) — sweeps files not
+  referenced by any DB row and older than 24h (configurable); backstop
+  for the case the in-app hooks can't catch (session expired, browser
+  closed mid-wizard).
+- `wsgi.py` (new), `requirements.txt` (pinned to installed versions +
+  `waitress`), `requirements-dev.txt` (new, `pytest`), `.env.example`
+  (new optional vars documented), `README.md` (production run, test run,
+  maintenance script instructions).
+- `tests/` (new) — `conftest.py` + 16 pytest cases across
+  `test_balance.py`, `test_transaction_id.py`, `test_uploads.py`. All
+  pass. Verified via the actual dev server too: restarted `app.py`,
+  hammered `/login/admin` with 5 wrong-password POSTs (real CSRF tokens,
+  cookie jar) and confirmed the 5th response returns the lockout message
+  and a 6th is still blocked.
+
+**Deliberately NOT done, and why:**
+- **Flask-Migrate/Alembic adoption** — needs `flask db stamp head` run
+  against the real `instance/expenses.db` with the user present the
+  first time, not silently by an agent. `architecture.md` §2.3 has the
+  order to follow when ready.
+- **A real DB unique constraint on `docket_no`** — same reason; the
+  app-level check added now is a reasonable interim (catches the same
+  mistake, just not race-proof under concurrent submission of the exact
+  same docket number in the same instant, which is an unlikely scenario
+  for this app's usage pattern).
+- **Actual production deployment** (Nginx/systemd/TLS) — infra outside
+  this codebase; `wsgi.py` + `waitress`/`gunicorn` are ready, nothing is
+  running behind them yet.
+- **Backup automation** — needs a destination/schedule decision first.
+- **Priority 3 product features** (approval workflow, notifications,
+  multi-admin, CSV export) — untouched, per the standing open questions
+  below; these need a product decision, not just an implementation.
+
 ## 2026-09-20 (later same day) — Full doc review and upgrade pass
 
 Reviewed all six docs end-to-end for consistency and gaps, and upgraded

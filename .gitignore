@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+.pytest_cache/
 .env
 venv/
 .venv/
@@ -10,7 +11,5 @@ uploads/invoices/*
 !uploads/invoices/.gitkeep
 uploads/payment_screenshots/*
 !uploads/payment_screenshots/.gitkeep
-reports/*
-!reports/.gitkeep
 *.xlsx
 .DS_Store

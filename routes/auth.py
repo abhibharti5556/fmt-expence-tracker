@@ -7,8 +7,22 @@ from flask import (
 
 from models import User
 from utils.decorators import login_required
+from utils.helpers import delete_uploaded_file
+from utils.rate_limit import is_locked_out, record_failure, record_success
 
 auth_bp = Blueprint("auth", __name__)
+
+
+def _lockout_config():
+    return (
+        current_app.config["LOGIN_MAX_ATTEMPTS"],
+        current_app.config["LOGIN_ATTEMPT_WINDOW_MINUTES"],
+        current_app.config["LOGIN_LOCKOUT_MINUTES"],
+    )
+
+
+def _client_ip():
+    return request.remote_addr or "unknown"
 
 
 @auth_bp.route("/")
@@ -37,18 +51,38 @@ def admin_login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
+        ip = _client_ip()
+
+        remaining = is_locked_out("ADMIN", username or "admin", ip)
+        if remaining is not None:
+            flash(
+                f"Too many failed attempts. Try again in {int(remaining // 60) + 1} minute(s).",
+                "error",
+            )
+            return render_template("auth/admin_login.html")
 
         valid_username = secrets.compare_digest(username, current_app.config["ADMIN_USERNAME"])
         valid_password = secrets.compare_digest(password, current_app.config["ADMIN_PASSWORD"])
 
         if valid_username and valid_password:
+            record_success("ADMIN", username, ip)
             session.clear()
+            session.permanent = True
             session["role"] = "ADMIN"
             session["username"] = username
             flash("Welcome back, Admin.", "success")
             return redirect(url_for("admin.dashboard"))
 
-        flash("Invalid username or password.", "error")
+        max_attempts, window_minutes, lockout_minutes = _lockout_config()
+        locked = record_failure(
+            "ADMIN", username or "admin", ip, max_attempts, window_minutes, lockout_minutes
+        )
+        if locked:
+            flash(
+                f"Too many failed attempts. Try again in {lockout_minutes} minute(s).", "error"
+            )
+        else:
+            flash("Invalid username or password.", "error")
 
     return render_template("auth/admin_login.html")
 
@@ -61,24 +95,47 @@ def employee_login():
     if request.method == "POST":
         employee_id = request.form.get("employee_id", "").strip()
         password = request.form.get("password", "")
+        ip = _client_ip()
+
+        remaining = is_locked_out("EMPLOYEE", employee_id or "unknown", ip)
+        if remaining is not None:
+            flash(
+                f"Too many failed attempts. Try again in {int(remaining // 60) + 1} minute(s).",
+                "error",
+            )
+            return render_template("auth/employee_login.html")
 
         user = User.query.filter_by(employee_id=employee_id).first()
 
         if user and user.is_active() and user.check_password(password):
+            record_success("EMPLOYEE", employee_id, ip)
             session.clear()
+            session.permanent = True
             session["role"] = "EMPLOYEE"
             session["user_id"] = user.id
             session["employee_id"] = user.employee_id
             flash(f"Welcome back, {user.name}.", "success")
             return redirect(url_for("employee.dashboard"))
 
-        flash("Invalid Employee ID or password.", "error")
+        max_attempts, window_minutes, lockout_minutes = _lockout_config()
+        locked = record_failure(
+            "EMPLOYEE", employee_id or "unknown", ip, max_attempts, window_minutes, lockout_minutes
+        )
+        if locked:
+            flash(
+                f"Too many failed attempts. Try again in {lockout_minutes} minute(s).", "error"
+            )
+        else:
+            flash("Invalid Employee ID or password.", "error")
 
     return render_template("auth/employee_login.html")
 
 
 @auth_bp.route("/logout")
 def logout():
+    draft = session.get("expense_draft")
+    if draft and draft.get("invoice_file"):
+        delete_uploaded_file(current_app.config["INVOICE_FOLDER"], draft["invoice_file"])
     session.clear()
     flash("You have been logged out.", "info")
     return redirect(url_for("auth.login_select"))

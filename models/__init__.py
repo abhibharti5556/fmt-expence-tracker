@@ -10,6 +10,7 @@ from .models import (
     PAYMENT_STATUS_SUBMITTED,
     BALANCE_COUNTING_STATUSES,
 )
+from .audit import AdminAuditLog, log_admin_action
 
 __all__ = [
     "User",
@@ -22,4 +23,6 @@ __all__ = [
     "EXPENSE_TYPE_WAREHOUSING",
     "PAYMENT_STATUS_SUBMITTED",
     "BALANCE_COUNTING_STATUSES",
+    "AdminAuditLog",
+    "log_admin_action",
 ]

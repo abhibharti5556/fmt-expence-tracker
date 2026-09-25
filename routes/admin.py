@@ -12,6 +12,7 @@ from models import (
     User, MoneyTransaction, Expense,
     STATUS_ACTIVE, STATUS_INACTIVE, TRANSACTION_TYPE_CREDIT,
     EXPENSE_TYPE_LOGISTICS, EXPENSE_TYPE_WAREHOUSING, BALANCE_COUNTING_STATUSES,
+    log_admin_action,
 )
 from utils.decorators import admin_required
 from utils.helpers import get_employee_balance, get_employee_totals, get_total_spent, get_total_credited
@@ -248,6 +249,10 @@ def add_employee():
                 )
             )
 
+        log_admin_action(
+            _admin_username(), "CREATE_EMPLOYEE", target_user_id=user.id,
+            detail=f"Created {user.employee_id} ({user.name})",
+        )
         db.session.commit()
         flash("Employee account created successfully.", "success")
         return redirect(url_for("admin.employees"))
@@ -301,10 +306,25 @@ def edit_employee(user_id):
                 flash(err, "error")
             return render_template("admin/employee_form.html", mode="edit", form=form, employee=user)
 
+        changes = []
+        if user.name != name:
+            changes.append(f"name: '{user.name}' -> '{name}'")
+        if user.mobile != mobile:
+            changes.append(f"mobile: '{user.mobile}' -> '{mobile}'")
+        if user.email != email:
+            changes.append(f"email: '{user.email}' -> '{email}'")
+        if user.status != status:
+            changes.append(f"status: '{user.status}' -> '{status}'")
+
         user.name = name
         user.mobile = mobile
         user.email = email
         user.status = status
+        if changes:
+            log_admin_action(
+                _admin_username(), "EDIT_EMPLOYEE", target_user_id=user.id,
+                detail="; ".join(changes),
+            )
         db.session.commit()
         flash("Employee details updated successfully.", "success")
         return redirect(url_for("admin.employee_detail", user_id=user.id))
@@ -325,6 +345,10 @@ def reset_password(user_id):
         flash("Passwords do not match.", "error")
     else:
         user.set_password(new_password)
+        log_admin_action(
+            _admin_username(), "RESET_PASSWORD", target_user_id=user.id,
+            detail=f"Password reset for {user.employee_id}",
+        )
         db.session.commit()
         flash(f"Password reset successfully for {user.employee_id}.", "success")
 
@@ -336,6 +360,10 @@ def reset_password(user_id):
 def toggle_status(user_id):
     user = User.query.get_or_404(user_id)
     user.status = STATUS_INACTIVE if user.status == STATUS_ACTIVE else STATUS_ACTIVE
+    log_admin_action(
+        _admin_username(), "TOGGLE_STATUS", target_user_id=user.id,
+        detail=f"{user.employee_id} set to {user.status}",
+    )
     db.session.commit()
     flash(f"{user.name} is now {user.status}.", "success")
     return redirect(request.referrer or url_for("admin.employees"))

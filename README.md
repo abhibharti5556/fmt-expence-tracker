@@ -2,6 +2,8 @@
 
 An internal expense management web application for **Final Mile Techies**, a logistics and warehousing company. Tracks employee balances, logistics/warehousing expenses, UPI payment confirmation, invoices, and gives Admin a full financial dashboard with Excel exports.
 
+Deeper project docs — product scope, architecture, business rules, design system, task tracker, and the decision log — live in [`docs/`](docs/).
+
 ## Features
 
 - Admin and Employee login (separate, role-based)
@@ -17,6 +19,10 @@ An internal expense management web application for **Final Mile Techies**, a log
 - Professional Excel reports (expense report + money distribution report) via pandas + openpyxl
 - Secure file storage — all documents served through authenticated Flask routes, never as static files
 - CSRF protection, hashed passwords, role-based access control
+- Login lockout after repeated failed attempts, idle session expiry, hardened session cookies
+- Admin action audit log (employee create/edit, password resets, activate/deactivate)
+- Duplicate Docket Number detection at submission time
+- SQLite writes are serialized (`BEGIN IMMEDIATE`) so a balance check can never race an expense insert
 
 ## Tech Stack
 
@@ -51,6 +57,9 @@ FLASK_DEBUG=False
 - `ADMIN_USERNAME` / `ADMIN_PASSWORD` — the single Admin account. Not stored in the database.
 - `COMPANY_UPI_ID` — the UPI ID employees pay into when submitting an expense.
 - `FLASK_DEBUG` — keep `False` in production; only enable for local development.
+- `SESSION_LIFETIME_HOURS` — idle session expiry, default 8.
+- `SESSION_COOKIE_SECURE` — set `True` once served over HTTPS; must stay `False` for local HTTP dev.
+- `LOGIN_MAX_ATTEMPTS` / `LOGIN_ATTEMPT_WINDOW_MINUTES` / `LOGIN_LOCKOUT_MINUTES` — failed-login lockout tuning (defaults: 5 attempts / 10 minutes / 15-minute lockout).
 
 **Never commit your real `.env` file** — it's already excluded via `.gitignore`.
 
@@ -60,11 +69,39 @@ No manual migration step is needed. On first run, the app automatically creates 
 
 ## How to Run
 
+**Local development:**
 ```bash
 python app.py
 ```
 
+**Production** (behind a real WSGI server, not the Flask dev server):
+```bash
+# Windows
+venv\Scripts\waitress-serve --listen=0.0.0.0:8000 wsgi:app
+
+# Linux
+gunicorn -w 4 -b 0.0.0.0:8000 wsgi:app
+```
+
 The app runs at `http://127.0.0.1:5000` by default. Log in as Admin with the credentials from `.env`, create employee accounts, add money, and employees can then log in with their Employee ID.
+
+## Running Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+Tests run against an isolated temp SQLite DB and temp upload folders — they never touch `instance/expenses.db` or `uploads/`.
+
+## Maintenance
+
+Uploaded invoice files are cleaned up automatically when an expense wizard is abandoned or the session ends. For files orphaned by an expired session (browser closed mid-wizard), run the sweep script periodically (e.g. a daily scheduled task):
+
+```bash
+python scripts/cleanup_orphaned_uploads.py --dry-run   # preview
+python scripts/cleanup_orphaned_uploads.py              # delete
+```
 
 ## File Uploads
 

@@ -4,6 +4,11 @@
 > targeted additions; **§8 is entirely new** (security/integrity rules
 > that weren't documented anywhere before). See `memory.md` for the
 > review log.
+>
+> **Update (2026-09-20, later):** Most items below marked
+> **[recommended]** are now implemented — see the inline "✅ implemented"
+> notes and `memory.md`'s "Implementation pass" entry for what changed
+> and where.
 
 Source of truth for every rule is the code cited in parentheses. If this
 file and the code disagree, the code wins — update this file to match.
@@ -23,12 +28,11 @@ treat it as a rule to implement, not a description of current behavior.
   (`BALANCE_COUNTING_STATUSES = ("SUBMITTED",)`). If future statuses like
   `VERIFIED`/`REJECTED` are added, this tuple is the single place that
   decides what still counts.
-- **[NEW — recommended]** The final balance check in `expense_confirm`
-  must happen **inside the same database transaction** as the `Expense`
-  insert, not as a separate query beforehand. Today this is a read-then-
-  write with a gap in between; it is only safe because the current dev
-  server is single-process. Before running under multiple workers/threads,
-  this must become one atomic operation (see `architecture.md` §7).
+- **✅ implemented (2026-09-20).** The balance check and the `Expense`
+  insert are now effectively atomic: `app.py` forces every SQLite
+  transaction to take the write lock (`BEGIN IMMEDIATE`) at its first
+  statement, not at first write, so no second request can read a stale
+  balance while this one is mid-submission. See `architecture.md` §7.
 
 ## 2. Identity & Auth
 
@@ -40,10 +44,10 @@ treat it as a rule to implement, not a description of current behavior.
   upper-cased on creation (`routes/admin.py: add_employee`).
 - **Password** minimum length: 6 characters, for both employee creation
   and password reset/change (`routes/admin.py`, `routes/employee.py`).
-  **[NEW — recommended]** 6 characters with no complexity requirement is
-  weak for an app that gates money movement. Recommend raising the
-  minimum to 8+ characters and requiring at least one letter and one
-  digit.
+  **[recommended, not yet implemented]** 6 characters with no complexity
+  requirement is weak for an app that gates money movement. Recommend
+  raising the minimum to 8+ characters and requiring at least one letter
+  and one digit — tracked in `task.md`.
 - **Mobile**: `^\+?\d{10,15}$`. **Email**: simple `local@domain.tld` regex
   (not full RFC 5322) — both enforced on employee create/edit and
   employee's own profile edit.
@@ -52,10 +56,9 @@ treat it as a rule to implement, not a description of current behavior.
   flips to Inactive (checked on every request via `employee_required`).
 - Session is cleared (`session.clear()`) on every login and logout — no
   role/session bleed-over between Admin and Employee.
-- **[NEW — recommended]** No session lifetime is currently configured —
-  a session cookie is valid until the browser clears it. Set
-  `PERMANENT_SESSION_LIFETIME` (e.g. 8–12 hours) and mark sessions
-  non-permanent by default so idle sessions expire.
+- **✅ implemented (2026-09-20).** `PERMANENT_SESSION_LIFETIME` defaults
+  to 8 hours (env-configurable via `SESSION_LIFETIME_HOURS`);
+  `session.permanent = True` is set on every successful login.
 
 ## 3. Expenses
 
@@ -74,11 +77,13 @@ treat it as a rule to implement, not a description of current behavior.
   table until the final confirm step. Abandoning the wizard at any
   earlier step leaves no expense record (but does leave the already-
   uploaded invoice file on disk — see `task.md`).
-- **[NEW — recommended]** `docket_no` has no uniqueness constraint today,
-  so the same docket number can be logged more than once. Recommend a
-  unique index on `docket_no` (nullable-safe, since Warehousing expenses
-  have none) so a duplicate is caught at submission time rather than
-  discovered during an audit.
+- **✅ implemented (2026-09-20), partially.** Submitting a Logistics
+  expense with a Docket Number that already exists (case-insensitive) is
+  now blocked with an error naming the earlier transaction
+  (`routes/employee.py: expense_logistics`). This is an app-level check,
+  not a DB constraint — a genuine unique index still requires
+  Flask-Migrate (not yet adopted; see `task.md`) to apply safely to the
+  existing database.
 
 ## 4. Money Transactions (Admin → Employee)
 
@@ -125,25 +130,25 @@ treat it as a rule to implement, not a description of current behavior.
   same query function, no separate "export all" path that could diverge
   from what's on screen.
 
-## 8. Security & Audit — [NEW section]
+## 8. Security & Audit
 
-None of the following exist in the code yet. They're captured here as
-rules to implement (in priority order for an app that moves real money),
-mirroring `architecture.md` §5 and `task.md`.
+Originally captured as a set of gaps; most are now implemented
+(2026-09-20). Mirrors `architecture.md` §5 and `task.md`.
 
-1. **[recommended] Login rate-limiting / lockout.** Neither the Admin nor
-   the Employee login route currently limits repeated failed attempts.
-   Add a per-identity (and per-IP) attempt counter with a temporary
-   lockout or increasing delay after, e.g., 5 failed attempts in 10
-   minutes.
-2. **[recommended] Admin action audit log.** Today only money credits
-   record `created_by`. Extend this pattern to employee create/edit,
-   password resets, and activate/deactivate actions — a simple
-   `AdminAuditLog(admin_username, action, target_user_id, timestamp,
-   detail)` table is enough; no UI is required initially, just the
-   record.
-3. **[recommended] Session hardening.** `PERMANENT_SESSION_LIFETIME` set
-   explicitly; `SESSION_COOKIE_HTTPONLY=True`; `SESSION_COOKIE_SECURE=True`
-   once served over HTTPS; `SESSION_COOKIE_SAMESITE="Lax"`.
-4. **[recommended] Balance-check atomicity.** See §1 — must be fixed
-   before running under any multi-worker production server.
+1. **✅ implemented — Login rate-limiting / lockout.**
+   `utils/rate_limit.py`: 5 failed attempts (configurable) within a
+   10-minute window locks that identity+IP out for 15 minutes. In-memory
+   — resets on process restart, and is per-process (not shared) if the
+   app ever runs under multiple worker processes. Verified against the
+   live dev server: 5 wrong-password POSTs to `/login/admin` trigger the
+   lockout message; a 6th is still blocked.
+2. **✅ implemented — Admin action audit log.** `models/audit.py:
+   AdminAuditLog` + `log_admin_action()`, called from
+   `routes/admin.py` on employee create/edit/password-reset/
+   status-toggle. Money credits still use the pre-existing `created_by`
+   field on `MoneyTransaction` rather than duplicating into this table.
+   No UI yet — query `admin_audit_log` directly (e.g. via a SQLite
+   browser) until one is built.
+3. **✅ implemented — Session hardening.** See §2 above and `config.py`.
+4. **✅ implemented — Balance-check atomicity.** See §1 above and
+   `architecture.md` §7.

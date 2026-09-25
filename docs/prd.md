@@ -63,9 +63,9 @@ need rather than a settled decision, given multi-location operations]**.
    payment screenshot.
 6. Expense is recorded (`payment_status = SUBMITTED`) and now counts against
    the employee's balance; a success screen shows the transaction ID.
-   **[UPDATED — the balance check in steps 3–6 must be re-verified inside
-   the same database transaction that writes the final expense row, not
-   just re-queried beforehand. See `rules.md` §1 and `architecture.md` §7.]**
+   **✅ implemented (2026-09-20)** — the balance check in steps 3–6 is now
+   race-safe: every DB transaction takes SQLite's write lock at its first
+   statement, closing the gap. See `rules.md` §1 and `architecture.md` §7.
 
 ### 4.3 Admin: audit & report
 - Browse/search/filter all expenses (date range, employee, type, status,
@@ -109,9 +109,11 @@ need rather than a settled decision, given multi-location operations]**.
 - No automatic UPI payment verification — completion is self-reported by
   the employee.
 - No email/SMS notifications.
-- No multi-admin accounts, roles/permissions beyond Admin/Employee, or
-  audit log of Admin actions. **[UPDATED — the missing admin audit log is
-  now called out as a security gap in `rules.md` §8, not just a feature gap.]**
+- No multi-admin accounts or roles/permissions beyond Admin/Employee.
+  **✅ implemented (2026-09-20)** — the admin action audit log gap flagged
+  in `rules.md` §8 is closed (`AdminAuditLog`); multi-admin support
+  itself remains out of scope pending a product decision (see `memory.md`
+  open questions).
 - No mobile app — responsive web only.
 
 ## 7. Success Criteria
@@ -122,8 +124,11 @@ need rather than a settled decision, given multi-location operations]**.
   reference number) reachable from the admin audit view.
 - Monthly closing/reporting is a filtered Excel download, not manual
   spreadsheet reconciliation.
-- **[NEW]** No two concurrent expense submissions can ever cause an
-  employee's balance to go negative, even under production-scale
+- **✅ implemented (2026-09-20)** No two concurrent expense submissions can
+  cause an employee's balance to go negative, even under production-scale
   concurrent load (see `rules.md` §1 and `architecture.md` §7).
-- **[NEW]** Every admin-initiated change to money or employee records is
-  traceable to that admin, with a timestamp (see `rules.md` §8).
+- **✅ implemented (2026-09-20)** Every admin-initiated change to money or
+  employee records is traceable to that admin, with a timestamp — money
+  credits via `MoneyTransaction.created_by` (pre-existing), employee
+  create/edit/password-reset/status-toggle via the new `AdminAuditLog`
+  (see `rules.md` §8).
