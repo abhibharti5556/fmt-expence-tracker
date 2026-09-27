@@ -1,6 +1,6 @@
 from functools import wraps
 
-from flask import session, redirect, url_for, flash, abort, g
+from flask import session, redirect, url_for, flash, abort, g, request
 
 from extensions import db
 from models import User, AdminUser
@@ -21,8 +21,10 @@ def admin_required(f):
     @wraps(f)
     def wrapped(*args, **kwargs):
         if not session.get("role"):
-            flash("Please login to continue.", "info")
-            return redirect(url_for("auth.login_select"))
+            # Straight to admin login (not the role picker) with a `next`
+            # so an emailed deep link (e.g. "review this expense") lands
+            # the admin back on the exact page after they sign in.
+            return redirect(url_for("auth.admin_login", next=request.path))
         if session.get("role") != "ADMIN":
             abort(403)
         # `admin_id` is only set for accounts created in the admin_users

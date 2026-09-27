@@ -110,7 +110,7 @@ def build_expense_report(expenses, from_date=None, to_date=None):
     headers = [
         "Transaction ID", "Date", "Time", "Employee ID", "Employee Name",
         "Expense Type", "Docket Number", "Category", "Amount", "Purpose", "Reason",
-        "Approved By", "Remarks", "UPI Reference Number", "Payment Status",
+        "Approval Required From", "Remarks", "UPI Reference Number", "Payment Status",
         "Rejection Reason", "Invoice File", "Payment Screenshot",
     ]
     for idx, header in enumerate(headers, start=1):

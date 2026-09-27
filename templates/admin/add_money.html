@@ -13,13 +13,15 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="form-group-fmt">
-          <label class="form-label-fmt" for="user_id">Select Employee<span class="required">*</span></label>
-          <select class="form-select-fmt" id="user_id" name="user_id" required>
-            <option value="">Choose an employee…</option>
-            {% for emp in employees %}
-            <option value="{{ emp.id }}" {{ 'selected' if preselect == emp.id }}>{{ emp.employee_id }} — {{ emp.name }}</option>
-            {% endfor %}
-          </select>
+          <label class="form-label-fmt">Select Employee<span class="required">*</span></label>
+          {% if employees %}
+          {{ m.employee_picker(employees, preselect|string if preselect else '') }}
+          {% else %}
+          <div class="inline-alert error">
+            <i class="ph ph-warning-circle"></i>
+            <div>No active employees to credit money to yet.</div>
+          </div>
+          {% endif %}
         </div>
 
         <div class="form-group-fmt">

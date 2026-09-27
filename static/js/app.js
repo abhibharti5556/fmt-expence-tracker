@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", function () {
   initSubmitLock();
   initConfirmDialogs();
   initCategoryPickers();
+  initComboPickers();
 });
 
 // ---------------------------------------------------------------------------
@@ -209,18 +210,80 @@ function initConfirmDialogs() {
 }
 
 // ---------------------------------------------------------------------------
-// Category picker (visual radio-card grid)
+// Card pickers (visual radio-card groups): expense category, admin approver
 // ---------------------------------------------------------------------------
 function initCategoryPickers() {
-  document.querySelectorAll(".category-picker").forEach(function (picker) {
-    var cards = picker.querySelectorAll(".category-card");
+  _initCardPicker(".category-picker", ".category-card", "category-picker:change");
+  _initCardPicker(".admin-picker", ".admin-card", "admin-picker:change");
+}
+
+function _initCardPicker(pickerSelector, cardSelector, eventName) {
+  document.querySelectorAll(pickerSelector).forEach(function (picker) {
+    var cards = picker.querySelectorAll(cardSelector);
     cards.forEach(function (card) {
       var input = card.querySelector("input[type=radio]");
       input.addEventListener("change", function () {
         cards.forEach(function (c) { c.classList.remove("selected"); });
         card.classList.add("selected");
-        card.dispatchEvent(new Event("category-picker:change", { bubbles: true }));
+        card.dispatchEvent(new Event(eventName, { bubbles: true }));
       });
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Combo picker (click-to-open dropdown wrapping an admin-picker panel) --
+// used for "Approval Required From" and the Add Money employee picker, so
+// a long list of admins/employees doesn't sit permanently expanded on the
+// page; it only opens when the user actually needs to choose.
+// ---------------------------------------------------------------------------
+function initComboPickers() {
+  document.querySelectorAll("[data-combo-picker]").forEach(function (combo) {
+    var trigger = combo.querySelector(".combo-trigger");
+    var panel = combo.querySelector(".combo-panel");
+    if (!trigger || !panel) return;
+
+    trigger.setAttribute("aria-haspopup", "listbox");
+    trigger.setAttribute("aria-expanded", "false");
+
+    function close() {
+      panel.hidden = true;
+      trigger.classList.remove("open");
+      trigger.setAttribute("aria-expanded", "false");
+    }
+
+    function open() {
+      panel.hidden = false;
+      trigger.classList.add("open");
+      trigger.setAttribute("aria-expanded", "true");
+    }
+
+    trigger.addEventListener("click", function (e) {
+      e.preventDefault();
+      if (panel.hidden) { open(); } else { close(); }
+    });
+
+    panel.querySelectorAll("input[type=radio]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var card = input.closest(".admin-card");
+        var avatarEl = card.querySelector(".avatar-sm, .avatar-placeholder-sm");
+        var nameEl = card.querySelector(".admin-card-name");
+        var iconSlot = trigger.querySelector(".combo-trigger-icon-slot");
+        var label = trigger.querySelector(".combo-trigger-label");
+        if (iconSlot && avatarEl) iconSlot.innerHTML = avatarEl.outerHTML;
+        if (label && nameEl) {
+          label.textContent = nameEl.textContent;
+          label.classList.remove("combo-trigger-empty");
+        }
+        close();
+      });
+    });
+
+    document.addEventListener("click", function (e) {
+      if (!combo.contains(e.target)) close();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") close();
     });
   });
 }

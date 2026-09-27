@@ -78,7 +78,8 @@ def create_app(test_config=None):
     @app.context_processor
     def inject_globals():
         from datetime import datetime
-        from models import Expense, PAYMENT_STATUS_PENDING_APPROVAL
+        from utils.decorators import current_admin
+        from utils.helpers import get_pending_approvals_count
 
         sidebar_balance = None
         if session.get("role") == "EMPLOYEE" and session.get("user_id"):
@@ -86,9 +87,7 @@ def create_app(test_config=None):
 
         sidebar_pending_approvals = None
         if session.get("role") == "ADMIN":
-            sidebar_pending_approvals = Expense.query.filter_by(
-                payment_status=PAYMENT_STATUS_PENDING_APPROVAL
-            ).count()
+            sidebar_pending_approvals = get_pending_approvals_count(current_admin())
 
         return {
             "company_name": app.config["COMPANY_NAME"],

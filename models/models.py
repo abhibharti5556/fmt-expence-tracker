@@ -12,6 +12,12 @@ TRANSACTION_TYPE_CREDIT = "CREDIT"
 EXPENSE_TYPE_LOGISTICS = "LOGISTICS"
 EXPENSE_TYPE_WAREHOUSING = "WAREHOUSING"
 
+# Wallet refill request: the "Request Wallet Refill" button only appears
+# once balance drops below this, and can only be used once per cooldown
+# window per employee (regardless of balance) so admins aren't spammed.
+LOW_BALANCE_THRESHOLD = 100
+REFILL_REQUEST_COOLDOWN_HOURS = 24
+
 # Fixed category list shown on the Logistics expense form. Kept as a plain
 # list (not a DB enum) so adding/renaming a category is a code change, not
 # a migration; the `category` column just stores whichever string was
@@ -89,9 +95,10 @@ WAREHOUSING_CATEGORY_ICONS = {
 # Kept as plain string columns (not a DB enum) so new statuses can be
 # introduced without a migration.
 #
-# Logistics expenses go SUBMITTED-equivalent (PENDING_APPROVAL) at
-# creation, then an admin moves them to APPROVED or REJECTED. Warehousing
-# expenses still go straight to SUBMITTED (no approval step).
+# Every expense (logistics or warehousing) goes PENDING_APPROVAL at
+# creation, then the assigned admin moves it to APPROVED or REJECTED.
+# PAYMENT_STATUS_SUBMITTED is kept only for rows created before this
+# approval step existed.
 #
 # Balance/KPI/report totals reserve the amount as soon as it's submitted,
 # not just once approved -- an employee's balance drops immediately and
@@ -127,6 +134,10 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False, default="EMPLOYEE")
     status = db.Column(db.String(20), nullable=False, default=STATUS_ACTIVE)
+    # Rate-limits the "Request Wallet Refill" button to once every 24
+    # hours (only shown once balance drops below the low-balance
+    # threshold in the first place).
+    last_refill_request_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(
         db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -183,7 +194,14 @@ class Expense(db.Model):
     category = db.Column(db.String(50), nullable=True)
     purpose = db.Column(db.String(255), nullable=False)
     reason = db.Column(db.String(500), nullable=True)
+    # Display name of the chosen approver, kept for backward compatibility
+    # with expenses submitted before admin accounts existed. The real,
+    # enforceable link is assigned_admin_id below.
     approved_by = db.Column(db.String(120), nullable=False)
+    # The one admin account allowed to approve/reject this expense (and who
+    # gets the notification email). Nullable so old rows (and any future
+    # expense type that skips this) fall back to "any admin may act on it".
+    assigned_admin_id = db.Column(db.Integer, db.ForeignKey("admin_users.id"), nullable=True)
     remarks = db.Column(db.String(500), nullable=True)
 
     upi_reference_no = db.Column(db.String(60), nullable=False)
@@ -199,6 +217,8 @@ class Expense(db.Model):
     updated_at = db.Column(
         db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+    assigned_admin = db.relationship("AdminUser", foreign_keys=[assigned_admin_id])
 
     def __repr__(self):
         return f"<Expense {self.transaction_id} {self.expense_type} {self.amount}>"

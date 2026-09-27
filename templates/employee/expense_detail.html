@@ -51,7 +51,7 @@
       <div class="detail-item"><div class="detail-label">Purpose</div><div class="detail-value">{{ expense.purpose }}</div></div>
       <div class="detail-item"><div class="detail-label">Why Required</div><div class="detail-value">{{ expense.reason or 'N/A' }}</div></div>
       {% endif %}
-      <div class="detail-item"><div class="detail-label">Approved By</div><div class="detail-value">{{ expense.approved_by }}</div></div>
+      <div class="detail-item"><div class="detail-label">Approval Required From</div><div class="detail-value">{{ expense.approved_by }}</div></div>
       <div class="detail-item"><div class="detail-label">Remarks</div><div class="detail-value">{{ expense.remarks or '—' }}</div></div>
       <div class="detail-item"><div class="detail-label">UPI Reference Number</div><div class="detail-value mono">{{ expense.upi_reference_no }}</div></div>
     </div>

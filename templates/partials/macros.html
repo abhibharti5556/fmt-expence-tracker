@@ -99,3 +99,58 @@
     <span class="avatar-placeholder-{{ size }}">{{ user.name[:1]|upper }}</span>
   {% endif %}
 {% endmacro %}
+
+{% macro _combo_trigger_icon(selected, placeholder_icon='ph-user-circle') %}
+<span class="combo-trigger-icon-slot">
+  {% if selected %}{{ avatar(selected, 'sm') }}{% else %}<i class="ph {{ placeholder_icon }} combo-trigger-icon" aria-hidden="true"></i>{% endif %}
+</span>
+{% endmacro %}
+
+{% macro admin_picker(admins, selected_id, name='approved_by') %}
+{% set ns = namespace(selected=None) %}
+{% for a in admins %}{% if selected_id == a.id|string %}{% set ns.selected = a %}{% endif %}{% endfor %}
+<div class="combo-picker" data-combo-picker>
+  <button type="button" class="combo-trigger">
+    {{ _combo_trigger_icon(ns.selected) }}
+    <span class="combo-trigger-label {{ 'combo-trigger-empty' if not ns.selected }}">{{ ns.selected.name if ns.selected else 'Select an approver' }}</span>
+    <i class="ph ph-caret-down combo-trigger-caret" aria-hidden="true"></i>
+  </button>
+  <div class="admin-picker combo-panel" hidden>
+    {% for a in admins %}
+    <label class="admin-card {{ 'selected' if selected_id == a.id|string }}">
+      <input type="radio" name="{{ name }}" value="{{ a.id }}" {{ 'checked' if selected_id == a.id|string }} required>
+      {{ avatar(a, 'sm') }}
+      <span class="admin-card-info">
+        <span class="admin-card-name admin-card-name-only">{{ a.name }}</span>
+      </span>
+      <i class="ph ph-check-circle admin-card-check" aria-hidden="true"></i>
+    </label>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+{% macro employee_picker(employees, selected_id, name='user_id') %}
+{% set ns = namespace(selected=None) %}
+{% for emp in employees %}{% if selected_id == emp.id|string %}{% set ns.selected = emp %}{% endif %}{% endfor %}
+<div class="combo-picker" data-combo-picker>
+  <button type="button" class="combo-trigger">
+    {{ _combo_trigger_icon(ns.selected, 'ph-users-three') }}
+    <span class="combo-trigger-label {{ 'combo-trigger-empty' if not ns.selected }}">{{ ns.selected.name + ' (' + ns.selected.employee_id + ')' if ns.selected else 'Select an employee' }}</span>
+    <i class="ph ph-caret-down combo-trigger-caret" aria-hidden="true"></i>
+  </button>
+  <div class="admin-picker combo-panel" hidden>
+    {% for emp in employees %}
+    <label class="admin-card {{ 'selected' if selected_id == emp.id|string }}">
+      <input type="radio" name="{{ name }}" value="{{ emp.id }}" {{ 'checked' if selected_id == emp.id|string }} required>
+      {{ avatar(emp, 'sm') }}
+      <span class="admin-card-info">
+        <span class="admin-card-name">{{ emp.name }}</span>
+        <span class="admin-card-email"><span class="employee-id-badge">{{ emp.employee_id }}</span></span>
+      </span>
+      <i class="ph ph-check-circle admin-card-check" aria-hidden="true"></i>
+    </label>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}

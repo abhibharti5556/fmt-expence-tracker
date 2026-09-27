@@ -7,6 +7,8 @@ from decimal import Decimal, InvalidOperation
 from PIL import Image
 from werkzeug.utils import secure_filename
 
+from sqlalchemy import or_
+
 from extensions import db
 from models import (
     MoneyTransaction,
@@ -15,6 +17,7 @@ from models import (
     BALANCE_COUNTING_STATUSES,
     EXPENSE_TYPE_LOGISTICS,
     EXPENSE_TYPE_WAREHOUSING,
+    PAYMENT_STATUS_PENDING_APPROVAL,
 )
 
 
@@ -78,6 +81,19 @@ def get_employee_totals(user_id):
         "warehousing": warehousing,
         "balance": received - spent,
     }
+
+
+def get_pending_approvals_count(admin=None):
+    """Pending-approval count for the "you have X waiting" badges. For a
+    real admin account, scoped to expenses assigned to them (plus any
+    unassigned/legacy rows, which are open to any admin). `admin=None`
+    (the legacy bootstrap session) sees every pending expense."""
+    query = Expense.query.filter_by(payment_status=PAYMENT_STATUS_PENDING_APPROVAL)
+    if admin is not None:
+        query = query.filter(
+            or_(Expense.assigned_admin_id == admin.id, Expense.assigned_admin_id.is_(None))
+        )
+    return query.count()
 
 
 # ---------------------------------------------------------------------------

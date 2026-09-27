@@ -52,3 +52,14 @@ class Config:
     LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
     LOGIN_ATTEMPT_WINDOW_MINUTES = int(os.environ.get("LOGIN_ATTEMPT_WINDOW_MINUTES", "10"))
     LOGIN_LOCKOUT_MINUTES = int(os.environ.get("LOGIN_LOCKOUT_MINUTES", "15"))
+
+    # Outbound mail for expense-approval notifications (see utils/mailer.py).
+    # Leave SMTP_HOST blank to skip sending entirely -- nothing else in the
+    # approval workflow depends on mail actually going out.
+    SMTP_HOST = os.environ.get("SMTP_HOST", "")
+    SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+    SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
+    SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+    SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "True") == "True"
+    MAIL_FROM_ADDRESS = os.environ.get("MAIL_FROM_ADDRESS", "")
+    MAIL_FROM_NAME = os.environ.get("MAIL_FROM_NAME", "Final Mile Techies Expense Tracker")

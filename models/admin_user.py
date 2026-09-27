@@ -22,6 +22,10 @@ class AdminUser(db.Model):
     profile_image = db.Column(db.String(255), nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
     status = db.Column(db.String(20), nullable=False, default=STATUS_ACTIVE)
+    # Only a super admin can create new admin accounts. Everything else
+    # (editing, deactivating, resetting another admin's password, approving
+    # expenses) stays available to any active admin.
+    is_super_admin = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(
         db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow

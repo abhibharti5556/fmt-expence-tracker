@@ -20,6 +20,7 @@
         <h2 class="h5 mb-1">{{ target.name }}</h2>
         <div class="d-flex align-items-center gap-2 flex-wrap">
           {{ m.status_pill(target.status) }}
+          {% if target.is_super_admin %}<span class="pill pill-brand"><i class="ph ph-crown"></i> Super Admin</span>{% endif %}
         </div>
         <p class="text-muted-fmt mb-0 mt-1" style="font-size:0.85rem;">
           <i class="ph ph-envelope-simple"></i> {{ target.email }}

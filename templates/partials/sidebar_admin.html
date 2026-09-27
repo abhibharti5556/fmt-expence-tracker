@@ -1,3 +1,4 @@
+{% import "partials/macros.html" as m %}
 <aside class="sidebar" id="appSidebar">
   <div class="sidebar-brand">
     <img src="{{ url_for('static', filename='images/final-mile-techies-logo.png') }}" alt="Final Mile Techies logo">
@@ -36,8 +37,12 @@
   </nav>
 
   <div class="sidebar-footer">
-    <a href="{{ url_for('admin.profile') }}" class="sidebar-link {{ 'active' if request.endpoint == 'admin.profile' }}">
-      <i class="ph ph-user-circle"></i> Profile
+    <a href="{{ url_for('admin.profile') }}" class="sidebar-link sidebar-profile-link {{ 'active' if request.endpoint == 'admin.profile' }}">
+      {% if g.get('current_admin') %}{{ m.avatar(g.current_admin, 'sm') }}{% else %}<i class="ph ph-user-circle"></i>{% endif %}
+      <span class="sidebar-profile-info">
+        <strong>{{ g.current_admin.name if g.get('current_admin') else session.get('username', 'Admin') }}</strong>
+        <span>View Profile</span>
+      </span>
     </a>
     <a href="{{ url_for('auth.logout') }}" class="sidebar-link">
       <i class="ph ph-sign-out"></i> Logout

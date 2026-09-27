@@ -1,6 +1,6 @@
 import re
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import (
     Blueprint, render_template, request, redirect, url_for, flash,
@@ -9,17 +9,19 @@ from flask import (
 
 from extensions import db
 from models import (
-    Expense, MoneyTransaction,
+    Expense, MoneyTransaction, AdminUser,
     EXPENSE_TYPE_LOGISTICS, EXPENSE_TYPE_WAREHOUSING,
     LOGISTICS_CATEGORIES, LOGISTICS_CATEGORY_ICONS,
     WAREHOUSING_CATEGORIES, WAREHOUSING_CATEGORY_ICONS,
-    PAYMENT_STATUS_SUBMITTED, PAYMENT_STATUS_PENDING_APPROVAL,
+    STATUS_ACTIVE, PAYMENT_STATUS_PENDING_APPROVAL,
+    LOW_BALANCE_THRESHOLD, REFILL_REQUEST_COOLDOWN_HOURS,
 )
 from utils.decorators import employee_required, current_employee
 from utils.helpers import (
     get_employee_balance, get_employee_totals, generate_transaction_id,
     validate_image, validate_document, save_uploaded_file, delete_uploaded_file,
 )
+from utils.mailer import send_expense_approval_request, send_wallet_refill_request
 from utils.upi import build_upi_link
 
 employee_bp = Blueprint("employee", __name__, url_prefix="/employee")
@@ -41,6 +43,19 @@ def _discard_draft_invoice():
 # Dashboard
 # ---------------------------------------------------------------------------
 
+def _refill_cooldown_hours_left(user):
+    """None if the employee is free to send a refill request right now,
+    otherwise how many hours remain in the 24h cooldown (rounded up so
+    the message never claims "0 hours left" while still blocked)."""
+    if not user.last_refill_request_at:
+        return None
+    elapsed = datetime.utcnow() - user.last_refill_request_at
+    cooldown = timedelta(hours=REFILL_REQUEST_COOLDOWN_HOURS)
+    if elapsed >= cooldown:
+        return None
+    return max(1, int((cooldown - elapsed).total_seconds() // 3600) + 1)
+
+
 @employee_bp.route("/dashboard")
 @employee_required
 def dashboard():
@@ -49,7 +64,40 @@ def dashboard():
     recent_expenses = (
         Expense.query.filter_by(user_id=user.id).order_by(Expense.created_at.desc()).limit(5).all()
     )
-    return render_template("employee/dashboard.html", totals=totals, recent_expenses=recent_expenses)
+    low_balance = totals["balance"] < LOW_BALANCE_THRESHOLD
+    return render_template(
+        "employee/dashboard.html", totals=totals, recent_expenses=recent_expenses,
+        low_balance=low_balance,
+        refill_cooldown_hours_left=_refill_cooldown_hours_left(user) if low_balance else None,
+    )
+
+
+@employee_bp.route("/wallet/refill-request", methods=["POST"])
+@employee_required
+def wallet_refill_request():
+    user = current_employee()
+    balance = get_employee_balance(user.id)
+
+    if balance >= LOW_BALANCE_THRESHOLD:
+        flash(f"Refill requests are only available when your balance is below ₹{LOW_BALANCE_THRESHOLD}.", "error")
+        return redirect(url_for("employee.dashboard"))
+
+    cooldown_hours_left = _refill_cooldown_hours_left(user)
+    if cooldown_hours_left is not None:
+        flash(f"You've already requested a refill recently. Try again in about {cooldown_hours_left} hour(s).", "error")
+        return redirect(url_for("employee.dashboard"))
+
+    admins = _active_admins()
+    recent_expenses = (
+        Expense.query.filter_by(user_id=user.id).order_by(Expense.created_at.desc()).limit(10).all()
+    )
+    send_wallet_refill_request(user, admins, balance, recent_expenses)
+
+    user.last_refill_request_at = datetime.utcnow()
+    db.session.commit()
+
+    flash("Refill request sent to the admin team.", "success")
+    return redirect(url_for("employee.dashboard"))
 
 
 # ---------------------------------------------------------------------------
@@ -225,12 +273,30 @@ def expense_new():
     return render_template("employee/expense_new.html", balance=get_employee_balance(current_employee().id))
 
 
+def _active_admins():
+    """Admins an employee can pick as their approver. Excludes the super
+    admin -- they manage admin accounts, not day-to-day approvals."""
+    return AdminUser.query.filter_by(status=STATUS_ACTIVE, is_super_admin=False).order_by(AdminUser.name).all()
+
+
+def _resolve_assigned_admin(form_value):
+    """Validates the chosen 'Approval Required From' admin. Returns
+    (admin_or_none, error_or_none)."""
+    if not form_value or not form_value.isdigit():
+        return None, "Please select an admin to approve this expense."
+    admin = AdminUser.query.filter_by(id=int(form_value), status=STATUS_ACTIVE, is_super_admin=False).first()
+    if not admin:
+        return None, "The selected admin is no longer available. Please choose another."
+    return admin, None
+
+
 @employee_bp.route("/expense/new/logistics", methods=["GET", "POST"])
 @employee_required
 def expense_logistics():
     user = current_employee()
     draft = session.get("expense_draft")
     existing = draft if draft and draft.get("expense_type") == EXPENSE_TYPE_LOGISTICS else {}
+    admins = _active_admins()
 
     if request.method == "POST":
         form = request.form
@@ -240,7 +306,7 @@ def expense_logistics():
         docket_no = form.get("docket_no", "").strip()
         category = form.get("category", "").strip()
         purpose = form.get("purpose", "").strip()
-        approved_by = form.get("approved_by", "").strip()
+        approved_by_id = form.get("approved_by", "").strip()
         remarks = form.get("remarks", "").strip()
         invoice = request.files.get("invoice")
 
@@ -270,8 +336,10 @@ def expense_logistics():
             errors.append("Please describe the expense when selecting 'Others'.")
         if not purpose:
             purpose = category
-        if not approved_by:
-            errors.append("Approved By is required.")
+
+        assigned_admin, admin_error = _resolve_assigned_admin(approved_by_id)
+        if admin_error:
+            errors.append(admin_error)
 
         is_valid, file_error = validate_document(
             invoice, current_app.config["ALLOWED_DOCUMENT_EXTENSIONS"], current_app.config["MAX_DOCUMENT_SIZE"]
@@ -284,7 +352,7 @@ def expense_logistics():
                 flash(err, "error")
             return render_template(
                 "employee/expense_logistics_form.html", form=form, balance=get_employee_balance(user.id),
-                categories=LOGISTICS_CATEGORIES, icons=LOGISTICS_CATEGORY_ICONS,
+                categories=LOGISTICS_CATEGORIES, icons=LOGISTICS_CATEGORY_ICONS, admins=admins,
             )
 
         invoice_filename = save_uploaded_file(
@@ -298,7 +366,8 @@ def expense_logistics():
             "docket_no": docket_no,
             "category": category,
             "purpose": purpose,
-            "approved_by": approved_by,
+            "approved_by": assigned_admin.name,
+            "assigned_admin_id": assigned_admin.id,
             "remarks": remarks,
             "invoice_file": invoice_filename,
         }
@@ -307,7 +376,7 @@ def expense_logistics():
 
     return render_template(
         "employee/expense_logistics_form.html", form=existing, balance=get_employee_balance(user.id),
-        categories=LOGISTICS_CATEGORIES, icons=LOGISTICS_CATEGORY_ICONS,
+        categories=LOGISTICS_CATEGORIES, icons=LOGISTICS_CATEGORY_ICONS, admins=admins,
     )
 
 
@@ -317,6 +386,7 @@ def expense_warehousing():
     user = current_employee()
     draft = session.get("expense_draft")
     existing = draft if draft and draft.get("expense_type") == EXPENSE_TYPE_WAREHOUSING else {}
+    admins = _active_admins()
 
     if request.method == "POST":
         form = request.form
@@ -326,7 +396,7 @@ def expense_warehousing():
         category = form.get("category", "").strip()
         purpose = form.get("purpose", "").strip()
         reason = form.get("reason", "").strip()
-        approved_by = form.get("approved_by", "").strip()
+        approved_by_id = form.get("approved_by", "").strip()
         remarks = form.get("remarks", "").strip()
         invoice = request.files.get("invoice")
 
@@ -344,8 +414,10 @@ def expense_warehousing():
             errors.append("Purpose of Expense is required.")
         if not reason:
             errors.append("Please explain why this expense is required.")
-        if not approved_by:
-            errors.append("Approved By is required.")
+
+        assigned_admin, admin_error = _resolve_assigned_admin(approved_by_id)
+        if admin_error:
+            errors.append(admin_error)
 
         is_valid, file_error = validate_document(
             invoice, current_app.config["ALLOWED_DOCUMENT_EXTENSIONS"], current_app.config["MAX_DOCUMENT_SIZE"]
@@ -358,7 +430,7 @@ def expense_warehousing():
                 flash(err, "error")
             return render_template(
                 "employee/expense_warehousing_form.html", form=form, balance=get_employee_balance(user.id),
-                categories=WAREHOUSING_CATEGORIES, icons=WAREHOUSING_CATEGORY_ICONS,
+                categories=WAREHOUSING_CATEGORIES, icons=WAREHOUSING_CATEGORY_ICONS, admins=admins,
             )
 
         invoice_filename = save_uploaded_file(
@@ -372,7 +444,8 @@ def expense_warehousing():
             "category": category,
             "reason": reason,
             "purpose": purpose,
-            "approved_by": approved_by,
+            "approved_by": assigned_admin.name,
+            "assigned_admin_id": assigned_admin.id,
             "remarks": remarks,
             "invoice_file": invoice_filename,
         }
@@ -381,7 +454,7 @@ def expense_warehousing():
 
     return render_template(
         "employee/expense_warehousing_form.html", form=existing, balance=get_employee_balance(user.id),
-        categories=WAREHOUSING_CATEGORIES, icons=WAREHOUSING_CATEGORY_ICONS,
+        categories=WAREHOUSING_CATEGORIES, icons=WAREHOUSING_CATEGORY_ICONS, admins=admins,
     )
 
 
@@ -469,12 +542,6 @@ def expense_confirm():
             screenshot, current_app.config["PAYMENT_SCREENSHOT_FOLDER"], prefix=f"{user.employee_id}_"
         )
 
-        initial_status = (
-            PAYMENT_STATUS_PENDING_APPROVAL
-            if draft["expense_type"] == EXPENSE_TYPE_LOGISTICS
-            else PAYMENT_STATUS_SUBMITTED
-        )
-
         try:
             expense = Expense(
                 transaction_id=generate_transaction_id(),
@@ -486,9 +553,10 @@ def expense_confirm():
                 purpose=draft["purpose"],
                 reason=draft.get("reason"),
                 approved_by=draft["approved_by"],
+                assigned_admin_id=draft.get("assigned_admin_id"),
                 remarks=draft.get("remarks") or None,
                 upi_reference_no=upi_reference_no,
-                payment_status=initial_status,
+                payment_status=PAYMENT_STATUS_PENDING_APPROVAL,
                 invoice_file=draft["invoice_file"],
                 payment_screenshot=screenshot_filename,
             )
@@ -501,6 +569,7 @@ def expense_confirm():
             return render_template("employee/expense_confirm.html", draft=draft, amount=amount)
 
         session.pop("expense_draft", None)
+        send_expense_approval_request(expense)
         flash("Expense submitted successfully.", "success")
         return redirect(url_for("employee.expense_success", expense_id=expense.id))
 

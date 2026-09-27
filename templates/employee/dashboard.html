@@ -30,6 +30,25 @@
         <div><span>Received</span><strong>{{ totals.received|inr }}</strong></div>
         <div><span>Spent</span><strong>{{ totals.spent|inr }}</strong></div>
       </div>
+      {% if low_balance %}
+      <div class="balance-hero-refill">
+        {% if refill_cooldown_hours_left %}
+        <p class="form-hint mb-2">Refill already requested. You can ask again in about {{ refill_cooldown_hours_left }} hour(s).</p>
+        <button type="button" class="btn-fmt btn-fmt-outline btn-fmt-block" disabled>
+          <i class="ph ph-envelope-simple"></i> Request Wallet Refill
+        </button>
+        {% else %}
+        <form method="post" action="{{ url_for('employee.wallet_refill_request') }}" data-lock-submit novalidate>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <p class="form-hint mb-2">Your balance is below ₹100. Let the admin team know it's time for a top-up.</p>
+          <button type="submit" class="btn-fmt btn-fmt-primary btn-fmt-block">
+            <span class="btn-spinner"></span>
+            <span class="btn-label"><i class="ph ph-envelope-simple"></i> Request Wallet Refill</span>
+          </button>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
     </div>
   </div>
   <div class="col-12 col-lg-8">

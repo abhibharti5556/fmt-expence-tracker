@@ -1,4 +1,5 @@
 import secrets
+from urllib.parse import urlparse
 
 from flask import (
     Blueprint, render_template, request, redirect, url_for, session, flash,
@@ -25,6 +26,17 @@ def _client_ip():
     return request.remote_addr or "unknown"
 
 
+def _safe_next(target):
+    """Only ever redirect to a same-site relative path -- rejects anything
+    with a scheme/host (open-redirect) so an emailed `next` link can't be
+    abused to bounce a logged-in admin off to an attacker's site."""
+    if not target or not target.startswith("/") or target.startswith("//"):
+        return None
+    if urlparse(target).netloc:
+        return None
+    return target
+
+
 @auth_bp.route("/")
 def index():
     if session.get("role") == "ADMIN":
@@ -45,8 +57,10 @@ def login_select():
 
 @auth_bp.route("/login/admin", methods=["GET", "POST"])
 def admin_login():
+    next_url = _safe_next(request.values.get("next"))
+
     if session.get("role") == "ADMIN":
-        return redirect(url_for("admin.dashboard"))
+        return redirect(next_url or url_for("admin.dashboard"))
 
     if request.method == "POST":
         email = request.form.get("email", "").strip()
@@ -59,7 +73,7 @@ def admin_login():
                 f"Too many failed attempts. Try again in {int(remaining // 60) + 1} minute(s).",
                 "error",
             )
-            return render_template("auth/admin_login.html")
+            return render_template("auth/admin_login.html", next=next_url)
 
         admin = AdminUser.query.filter(AdminUser.email.ilike(email)).first() if email else None
 
@@ -71,7 +85,7 @@ def admin_login():
             session["admin_id"] = admin.id
             session["username"] = admin.name
             flash(f"Welcome back, {admin.name}.", "success")
-            return redirect(url_for("admin.dashboard"))
+            return redirect(next_url or url_for("admin.dashboard"))
 
         # Bootstrap path: lets the very first admin account be created via
         # the "Manage Admins" screen before any AdminUser rows exist yet.
@@ -85,7 +99,7 @@ def admin_login():
             session["role"] = "ADMIN"
             session["username"] = email
             flash("Welcome back, Admin.", "success")
-            return redirect(url_for("admin.dashboard"))
+            return redirect(next_url or url_for("admin.dashboard"))
 
         max_attempts, window_minutes, lockout_minutes = _lockout_config()
         locked = record_failure(
@@ -98,7 +112,9 @@ def admin_login():
         else:
             flash("Invalid email or password.", "error")
 
-    return render_template("auth/admin_login.html")
+        return render_template("auth/admin_login.html", next=next_url)
+
+    return render_template("auth/admin_login.html", next=next_url)
 
 
 @auth_bp.route("/login/employee", methods=["GET", "POST"])

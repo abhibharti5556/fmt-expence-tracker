@@ -13,6 +13,7 @@
 
     <form method="post" data-lock-submit novalidate>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 
       <div class="form-group-fmt">
         <label class="form-label-fmt" for="email">Email<span class="required">*</span></label>

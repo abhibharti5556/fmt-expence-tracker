@@ -19,7 +19,7 @@ from models import (
 from utils.decorators import admin_required, current_admin
 from utils.helpers import (
     get_employee_balance, get_employee_totals, get_total_spent, get_total_credited,
-    validate_image, save_uploaded_file, delete_uploaded_file,
+    validate_image, save_uploaded_file, delete_uploaded_file, get_pending_approvals_count,
 )
 from utils.excel_reports import build_expense_report, build_money_distribution_report
 
@@ -28,6 +28,14 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MOBILE_RE = re.compile(r"^\+?\d{10,15}$")
 EMPLOYEE_ID_RE = re.compile(r"^[A-Za-z0-9\-]{3,20}$")
+
+
+@admin_bp.route("/login")
+def login_redirect():
+    """Every other admin URL is /admin/..., so /admin/login is a natural
+    (if incorrect) guess for the login page -- it actually lives at
+    /login/admin. Bounce it there instead of 404ing."""
+    return redirect(url_for("auth.admin_login", **request.args))
 
 
 # ---------------------------------------------------------------------------
@@ -59,7 +67,7 @@ def dashboard():
     monthly_labels, monthly_values = _monthly_expense_trend(months=6)
     employee_labels, employee_values = _employee_wise_spending(limit=10)
 
-    pending_approvals = Expense.query.filter_by(payment_status=PAYMENT_STATUS_PENDING_APPROVAL).count()
+    pending_approvals = get_pending_approvals_count(current_admin())
 
     kpis = {
         "total_distributed": total_distributed,
@@ -522,25 +530,52 @@ def expense_detail(expense_id):
         .all()
     )
     return render_template(
-        "admin/expense_detail.html", expense=expense, logs=logs, back_url=url_for("admin.expenses")
+        "admin/expense_detail.html", expense=expense, logs=logs, back_url=url_for("admin.expenses"),
+        can_act=_can_act_on_expense(expense),
     )
 
 
-@admin_bp.route("/expenses/<int:expense_id>/approve", methods=["POST"])
+def _can_act_on_expense(expense):
+    """Only the admin the employee picked as approver may approve/reject
+    it -- unless this is the legacy bootstrap session (no specific
+    identity to restrict against) or the expense predates assignment
+    (assigned_admin_id is null), in which case any admin may act."""
+    admin = current_admin()
+    if admin is None or expense.assigned_admin_id is None:
+        return True
+    return expense.assigned_admin_id == admin.id
+
+
+@admin_bp.route("/expenses/<int:expense_id>/approve", methods=["GET", "POST"])
 @admin_required
 def expense_approve(expense_id):
+    """GET is the one-click "Approve" button in the notification email --
+    clicking it while logged out bounces through admin login (see
+    admin_required's `next` handling) and lands right back here, already
+    approved. POST is the in-app button on the expense detail page.
+    Either way the action only fires once: a second click/prefetch of the
+    same link is a no-op because the status is no longer PENDING_APPROVAL."""
     expense = Expense.query.get_or_404(expense_id)
+    if not _can_act_on_expense(expense):
+        flash(f"Only {expense.assigned_admin.name} can approve this expense.", "error")
+        return redirect(url_for("admin.expense_detail", expense_id=expense.id))
     if expense.payment_status != PAYMENT_STATUS_PENDING_APPROVAL:
-        flash("Only expenses awaiting approval can be approved.", "error")
+        if request.method == "GET" and expense.payment_status == PAYMENT_STATUS_APPROVED:
+            flash(f"Expense {expense.transaction_id} was already approved.", "info")
+        else:
+            flash("Only expenses awaiting approval can be approved.", "error")
         return redirect(url_for("admin.expense_detail", expense_id=expense.id))
 
     expense.payment_status = PAYMENT_STATUS_APPROVED
     expense.rejection_reason = None
     expense.reviewed_by = _admin_username()
     expense.reviewed_at = datetime.utcnow()
+    detail = f"{expense.transaction_id} ({expense.amount})"
+    if request.method == "GET":
+        detail += " -- approved via email link"
     log_admin_action(
         _admin_username(), "EXPENSE_APPROVED", target_user_id=expense.user_id,
-        target_expense_id=expense.id, detail=f"{expense.transaction_id} ({expense.amount})",
+        target_expense_id=expense.id, detail=detail,
     )
     db.session.commit()
     flash(f"Expense {expense.transaction_id} approved.", "success")
@@ -551,6 +586,9 @@ def expense_approve(expense_id):
 @admin_required
 def expense_reject(expense_id):
     expense = Expense.query.get_or_404(expense_id)
+    if not _can_act_on_expense(expense):
+        flash(f"Only {expense.assigned_admin.name} can reject this expense.", "error")
+        return redirect(url_for("admin.expense_detail", expense_id=expense.id))
     if expense.payment_status != PAYMENT_STATUS_PENDING_APPROVAL:
         flash("Only expenses awaiting approval can be rejected.", "error")
         return redirect(url_for("admin.expense_detail", expense_id=expense.id))
@@ -812,16 +850,28 @@ def admin_change_password():
 # Manage Admins (add/edit other admin accounts)
 # ---------------------------------------------------------------------------
 
+def _is_super_admin():
+    """Only a super admin may create new admin accounts. The legacy
+    env-credential session (no AdminUser row) is treated as a super admin
+    too, since it's the only way in before any account is a super admin."""
+    admin = current_admin()
+    return admin is None or admin.is_super_admin
+
+
 @admin_bp.route("/admins")
 @admin_required
 def admins():
     rows = AdminUser.query.order_by(AdminUser.created_at.desc()).all()
-    return render_template("admin/admins.html", rows=rows)
+    return render_template("admin/admins.html", rows=rows, is_super_admin=_is_super_admin())
 
 
 @admin_bp.route("/admins/add", methods=["GET", "POST"])
 @admin_required
 def add_admin():
+    if not _is_super_admin():
+        flash("Only a super admin can create new admin accounts.", "error")
+        return redirect(url_for("admin.admins"))
+
     if request.method == "POST":
         form = request.form
         errors = []
@@ -850,7 +900,9 @@ def add_admin():
                 flash(err, "error")
             return render_template("admin/admin_form.html", mode="add", form=form, target=None)
 
-        new_admin = AdminUser(name=name, email=email, mobile=mobile or None, status=STATUS_ACTIVE)
+        new_admin = AdminUser(
+            name=name, email=email, mobile=mobile or None, status=STATUS_ACTIVE, is_super_admin=False,
+        )
         new_admin.set_password(password)
         db.session.add(new_admin)
         db.session.flush()

@@ -36,6 +36,7 @@
 
     {% if expense.payment_status == 'PENDING_APPROVAL' %}
     <div class="card-fmt card-fmt-body mb-4">
+      {% if can_act %}
       <h3 class="h6 mb-3"><i class="ph ph-hourglass-medium"></i> Awaiting Your Approval</h3>
       <p class="text-muted-fmt mb-3">This expense is reserved against the employee's balance. Approve it once verified, or reject it with a reason.</p>
       <div class="d-flex flex-wrap gap-3">
@@ -49,6 +50,13 @@
           <button type="submit" class="btn-fmt btn-fmt-outline"><i class="ph ph-x-circle"></i> Reject</button>
         </form>
       </div>
+      {% else %}
+      <h3 class="h6 mb-3"><i class="ph ph-hourglass-medium"></i> Awaiting Approval</h3>
+      <p class="text-muted-fmt mb-0">
+        This expense is assigned to <strong>{{ expense.assigned_admin.name }}</strong>
+        ({{ expense.assigned_admin.email }}) for approval. Only they can approve or reject it.
+      </p>
+      {% endif %}
     </div>
     {% elif expense.payment_status == 'REJECTED' %}
     <div class="inline-alert error mb-4">
@@ -100,8 +108,10 @@
         </div>
         {% endif %}
         <div class="detail-item">
-          <div class="detail-label">Approved By</div>
-          <div class="detail-value">{{ expense.approved_by }}</div>
+          <div class="detail-label">Approval Required From</div>
+          <div class="detail-value">
+            {{ expense.approved_by }}{% if expense.assigned_admin %} ({{ expense.assigned_admin.email }}){% endif %}
+          </div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Remarks</div>

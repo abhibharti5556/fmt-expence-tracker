@@ -44,8 +44,17 @@
         </div>
 
         <div class="form-group-fmt">
-          <label class="form-label-fmt" for="approved_by">Approved By<span class="required">*</span></label>
-          <input type="text" class="form-control-fmt" id="approved_by" name="approved_by" required value="{{ form.approved_by or '' }}">
+          <label class="form-label-fmt">Approval Required From<span class="required">*</span></label>
+          {% if admins %}
+          {% set selected_admin_id = (form.assigned_admin_id or form.approved_by or '')|string %}
+          {{ m.admin_picker(admins, selected_admin_id) }}
+          <p class="form-hint">They'll be notified by email and are the only one who can approve or reject this expense.</p>
+          {% else %}
+          <div class="inline-alert error">
+            <i class="ph ph-warning-circle"></i>
+            <div>No accounts are set up yet to approve expenses. Please contact your administrator.</div>
+          </div>
+          {% endif %}
         </div>
 
         <div class="form-group-fmt">

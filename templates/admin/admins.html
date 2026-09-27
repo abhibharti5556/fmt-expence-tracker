@@ -8,9 +8,11 @@
 
 <div class="section-heading">
   <div></div>
+  {% if is_super_admin %}
   <a href="{{ url_for('admin.add_admin') }}" class="btn-fmt btn-fmt-primary">
     <i class="ph ph-user-plus"></i> Add Admin
   </a>
+  {% endif %}
 </div>
 
 <div class="card-fmt">
@@ -32,7 +34,7 @@
         {% for admin in rows %}
         <tr>
           <td>{{ m.avatar(admin, 'sm') }}</td>
-          <td>{{ admin.name }}</td>
+          <td>{{ admin.name }}{% if admin.is_super_admin %} <span class="pill pill-brand"><i class="ph ph-crown"></i> Super Admin</span>{% endif %}</td>
           <td>{{ admin.email }}</td>
           <td>{{ admin.mobile or 'N/A' }}</td>
           <td>{{ m.status_pill(admin.status) }}</td>
@@ -48,8 +50,10 @@
       </tbody>
     </table>
   </div>
-  {% else %}
+  {% elif is_super_admin %}
   {{ m.empty_state('ph-shield-check', 'No admin accounts yet', 'Add your first admin account.', url_for('admin.add_admin'), 'Add Admin') }}
+  {% else %}
+  {{ m.empty_state('ph-shield-check', 'No admin accounts yet', 'Ask your super admin to add one.') }}
   {% endif %}
 </div>
 
