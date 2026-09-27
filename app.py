@@ -3,7 +3,7 @@ import os
 from flask import Flask, render_template, session, g
 from sqlalchemy import event
 
-from config import Config, IS_VERCEL
+from config import Config
 from extensions import db, csrf
 from utils.helpers import format_inr, get_employee_balance
 
@@ -41,13 +41,8 @@ def _seed_super_admin(app):
     if configured. Create-only: never touches the password of an account
     that already exists, so a manual password change later survives the
     next restart. Skipped entirely when SUPER_ADMIN_EMAIL/PASSWORD aren't
-    set (the default) -- local dev keeps using the bootstrap
-    ADMIN_USERNAME/ADMIN_PASSWORD login untouched.
-
-    This is what makes "start fresh with a working admin" actually mean
-    something on Vercel: its database doesn't persist between cold
-    starts, so without a seed step a fresh cold start has no admin
-    accounts at all beyond the shared bootstrap login."""
+    set (the default) -- normal use goes through the /setup first-run
+    wizard instead, or the bootstrap ADMIN_USERNAME/ADMIN_PASSWORD login."""
     email = app.config.get("SUPER_ADMIN_EMAIL")
     password = app.config.get("SUPER_ADMIN_PASSWORD")
     if not email or not password:
@@ -77,22 +72,15 @@ def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(Config)
 
-    if not IS_VERCEL:
-        os.makedirs(app.instance_path, exist_ok=True)
+    os.makedirs(app.instance_path, exist_ok=True)
 
     if test_config:
         app.config.update(test_config)
 
     if "SQLALCHEMY_DATABASE_URI" not in app.config:
-        if IS_VERCEL:
-            # /tmp only -- see the IS_VERCEL note in config.py. Every cold
-            # start may see an empty database; this is a demo accommodation,
-            # not persistence.
-            app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:////tmp/expenses.db"
-        else:
-            app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(
-                app.instance_path, "expenses.db"
-            )
+        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(
+            app.instance_path, "expenses.db"
+        )
 
     for folder in (
         Config.PROFILE_IMAGE_FOLDER,

@@ -27,15 +27,6 @@ def _int_env(name, default):
     return int(value) if value else default
 
 
-# Vercel's deployed filesystem is read-only except /tmp, and /tmp is wiped
-# between invocations (so this is not real persistence -- data written
-# here can vanish at any time). This only exists so the app can boot and
-# demo on Vercel at all; it is not a substitute for a real deployment
-# target with a persistent disk.
-IS_VERCEL = os.environ.get("VERCEL") == "1"
-_UPLOAD_BASE = "/tmp/uploads" if IS_VERCEL else os.path.join(BASE_DIR, "uploads")
-
-
 class Config:
     SECRET_KEY = _str_env("SECRET_KEY", "dev-insecure-secret-key")
 
@@ -47,7 +38,7 @@ class Config:
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    UPLOAD_FOLDER = _UPLOAD_BASE
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
     PROFILE_IMAGE_FOLDER = os.path.join(UPLOAD_FOLDER, "profile_images")
     INVOICE_FOLDER = os.path.join(UPLOAD_FOLDER, "invoices")
     PAYMENT_SCREENSHOT_FOLDER = os.path.join(UPLOAD_FOLDER, "payment_screenshots")
@@ -96,10 +87,8 @@ class Config:
     # is_super_admin=True) exists on every boot -- see _seed_super_admin in
     # app.py. Blank SUPER_ADMIN_EMAIL skips seeding entirely (the default,
     # so local dev with the bootstrap ADMIN_USERNAME/ADMIN_PASSWORD login
-    # isn't affected). This is what makes "reset access" actually mean
-    # something on Vercel, where the database itself doesn't persist
-    # between cold starts -- without this, a fresh cold start has no
-    # admin accounts at all except the bootstrap one.
+    # isn't affected). Mainly useful for scripted/repeatable setups; for
+    # normal use the /setup first-run wizard covers this interactively.
     SUPER_ADMIN_EMAIL = os.environ.get("SUPER_ADMIN_EMAIL", "").strip()
     SUPER_ADMIN_NAME = _str_env("SUPER_ADMIN_NAME", "Super Admin")
     SUPER_ADMIN_PASSWORD = os.environ.get("SUPER_ADMIN_PASSWORD", "")

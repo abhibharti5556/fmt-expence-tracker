@@ -83,20 +83,7 @@ venv\Scripts\waitress-serve --listen=0.0.0.0:8000 wsgi:app
 gunicorn -w 4 -b 0.0.0.0:8000 wsgi:app
 ```
 
-The app runs at `http://127.0.0.1:5000` by default. Log in as Admin with the credentials from `.env`, create employee accounts, add money, and employees can then log in with their Employee ID.
-
-## Deploying to Vercel
-
-⚠️ **Vercel's deployed filesystem is read-only except `/tmp`, and `/tmp` does not persist between requests or deployments.** This app stores its database (SQLite) and all uploaded files (invoices, payment screenshots, profile photos) on disk. On Vercel, that means **data can be lost at any time** — a new employee, an expense, an uploaded invoice may vanish the next time the serverless function cold-starts. `api/index.py` and `vercel.json` in this repo make the app *boot* on Vercel by redirecting those writes to `/tmp`, but this is a demo accommodation, not real persistence. For actual production use with real data, deploy instead to a platform with a persistent disk (Render, Railway, Fly.io, a VPS) — no code changes needed for those.
-
-If you still want Vercel:
-
-1. Push this repo to GitHub (already done if you're reading this from the repo).
-2. In the [Vercel dashboard](https://vercel.com/new), import the GitHub repo. Vercel will detect `vercel.json` and `requirements.txt` automatically — no build command needed.
-3. Under **Project Settings → Environment Variables**, add every variable from `.env.example` — **each one needs an actual value typed in, not just the name left blank** (a blank `SECRET_KEY` crashes the app on the first request; a blank numeric setting crashes it at boot). At minimum: `SECRET_KEY` (generate with `python -c "import secrets; print(secrets.token_hex(32))"`), `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `COMPANY_UPI_ID`, `COMPANY_NAME`. Vercel does not read your local `.env` file — these must be entered in the dashboard.
-4. Also set `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_NAME`, and `SUPER_ADMIN_PASSWORD`. Because Vercel's database doesn't persist, a fresh cold start otherwise has *no* admin accounts beyond the shared bootstrap login above — these three guarantee one full (email+password, super-admin) account is automatically recreated every time the app boots, so you always have a reliable way in.
-5. Deploy. Every cold start begins with an empty database aside from that seeded super admin — you'll need to recreate employees after any cold start that lost the previous `/tmp` state.
-6. To actually keep data, swap `SQLALCHEMY_DATABASE_URI` for a hosted Postgres database (e.g. Neon or Supabase, both free-tier) and swap the local upload folders for object storage (e.g. Vercel Blob or S3) — ask if you want this done.
+The app runs at `http://127.0.0.1:5000` by default. On first run with an empty database, visiting the site takes you to a one-time setup screen to create the first Super Admin account — after that, log in there, create employee accounts, add money, and employees can then log in with their Employee ID.
 
 ## Maintenance
 
