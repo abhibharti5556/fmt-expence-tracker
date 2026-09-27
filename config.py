@@ -7,6 +7,17 @@ load_dotenv()
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
+
+def _int_env(name, default):
+    """int(os.environ.get(name, default)) crashes the whole app at import
+    time if the variable is set but left blank in a dashboard (Vercel,
+    Render, etc. all allow this) -- os.environ.get only falls back to
+    `default` when the key is absent, not when its value is "". Treat
+    blank the same as unset instead."""
+    value = os.environ.get(name, "").strip()
+    return int(value) if value else default
+
+
 # Vercel's deployed filesystem is read-only except /tmp, and /tmp is wiped
 # between invocations (so this is not real persistence -- data written
 # here can vanish at any time). This only exists so the app can boot and
@@ -48,7 +59,7 @@ class Config:
     # (Flask's default SESSION_REFRESH_EACH_REQUEST) so an active user is
     # never logged out mid-work, only after real inactivity.
     PERMANENT_SESSION_LIFETIME = timedelta(
-        hours=int(os.environ.get("SESSION_LIFETIME_HOURS", "8"))
+        hours=_int_env("SESSION_LIFETIME_HOURS", 8)
     )
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
@@ -57,15 +68,15 @@ class Config:
     SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "False") == "True"
 
     # Failed-login lockout (see utils/rate_limit.py)
-    LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
-    LOGIN_ATTEMPT_WINDOW_MINUTES = int(os.environ.get("LOGIN_ATTEMPT_WINDOW_MINUTES", "10"))
-    LOGIN_LOCKOUT_MINUTES = int(os.environ.get("LOGIN_LOCKOUT_MINUTES", "15"))
+    LOGIN_MAX_ATTEMPTS = _int_env("LOGIN_MAX_ATTEMPTS", 5)
+    LOGIN_ATTEMPT_WINDOW_MINUTES = _int_env("LOGIN_ATTEMPT_WINDOW_MINUTES", 10)
+    LOGIN_LOCKOUT_MINUTES = _int_env("LOGIN_LOCKOUT_MINUTES", 15)
 
     # Outbound mail for expense-approval notifications (see utils/mailer.py).
     # Leave SMTP_HOST blank to skip sending entirely -- nothing else in the
     # approval workflow depends on mail actually going out.
     SMTP_HOST = os.environ.get("SMTP_HOST", "")
-    SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+    SMTP_PORT = _int_env("SMTP_PORT", 587)
     SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
     SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
     SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "True") == "True"
