@@ -7,6 +7,14 @@ load_dotenv()
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
+# Vercel's deployed filesystem is read-only except /tmp, and /tmp is wiped
+# between invocations (so this is not real persistence -- data written
+# here can vanish at any time). This only exists so the app can boot and
+# demo on Vercel at all; it is not a substitute for a real deployment
+# target with a persistent disk.
+IS_VERCEL = os.environ.get("VERCEL") == "1"
+_UPLOAD_BASE = "/tmp/uploads" if IS_VERCEL else os.path.join(BASE_DIR, "uploads")
+
 
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-insecure-secret-key")
@@ -19,7 +27,7 @@ class Config:
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+    UPLOAD_FOLDER = _UPLOAD_BASE
     PROFILE_IMAGE_FOLDER = os.path.join(UPLOAD_FOLDER, "profile_images")
     INVOICE_FOLDER = os.path.join(UPLOAD_FOLDER, "invoices")
     PAYMENT_SCREENSHOT_FOLDER = os.path.join(UPLOAD_FOLDER, "payment_screenshots")

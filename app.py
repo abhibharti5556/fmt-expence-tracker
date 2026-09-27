@@ -3,7 +3,7 @@ import os
 from flask import Flask, render_template, session, g
 from sqlalchemy import event
 
-from config import Config
+from config import Config, IS_VERCEL
 from extensions import db, csrf
 from utils.helpers import format_inr, get_employee_balance
 
@@ -44,15 +44,22 @@ def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(Config)
 
-    os.makedirs(app.instance_path, exist_ok=True)
+    if not IS_VERCEL:
+        os.makedirs(app.instance_path, exist_ok=True)
 
     if test_config:
         app.config.update(test_config)
 
     if "SQLALCHEMY_DATABASE_URI" not in app.config:
-        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(
-            app.instance_path, "expenses.db"
-        )
+        if IS_VERCEL:
+            # /tmp only -- see the IS_VERCEL note in config.py. Every cold
+            # start may see an empty database; this is a demo accommodation,
+            # not persistence.
+            app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:////tmp/expenses.db"
+        else:
+            app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(
+                app.instance_path, "expenses.db"
+            )
 
     for folder in (
         Config.PROFILE_IMAGE_FOLDER,
