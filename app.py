@@ -36,6 +36,39 @@ def _configure_sqlite_locking(app):
             conn.exec_driver_sql("BEGIN IMMEDIATE")
 
 
+def _seed_super_admin(app):
+    """Guarantees Config.SUPER_ADMIN_EMAIL exists as an active super admin,
+    if configured. Create-only: never touches the password of an account
+    that already exists, so a manual password change later survives the
+    next restart. Skipped entirely when SUPER_ADMIN_EMAIL/PASSWORD aren't
+    set (the default) -- local dev keeps using the bootstrap
+    ADMIN_USERNAME/ADMIN_PASSWORD login untouched.
+
+    This is what makes "start fresh with a working admin" actually mean
+    something on Vercel: its database doesn't persist between cold
+    starts, so without a seed step a fresh cold start has no admin
+    accounts at all beyond the shared bootstrap login."""
+    email = app.config.get("SUPER_ADMIN_EMAIL")
+    password = app.config.get("SUPER_ADMIN_PASSWORD")
+    if not email or not password:
+        return
+
+    from models import AdminUser, STATUS_ACTIVE
+
+    if AdminUser.query.filter(AdminUser.email.ilike(email)).first():
+        return
+
+    admin = AdminUser(
+        name=app.config.get("SUPER_ADMIN_NAME", "Super Admin"),
+        email=email,
+        status=STATUS_ACTIVE,
+        is_super_admin=True,
+    )
+    admin.set_password(password)
+    db.session.add(admin)
+    db.session.commit()
+
+
 def create_app(test_config=None):
     """`test_config`, if given, is applied after the normal Config object
     and can override anything (DB URI, upload folders, etc.) — used by the
@@ -119,6 +152,7 @@ def create_app(test_config=None):
 
     with app.app_context():
         db.create_all()
+        _seed_super_admin(app)
 
     return app
 

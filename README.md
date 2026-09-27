@@ -93,9 +93,10 @@ If you still want Vercel:
 
 1. Push this repo to GitHub (already done if you're reading this from the repo).
 2. In the [Vercel dashboard](https://vercel.com/new), import the GitHub repo. Vercel will detect `vercel.json` and `requirements.txt` automatically — no build command needed.
-3. Under **Project Settings → Environment Variables**, add every variable from `.env.example` (`SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `COMPANY_UPI_ID`, `COMPANY_NAME`, and the `SMTP_*` ones if you want approval/refill emails to send). Vercel does not read your local `.env` file — these must be set in the dashboard.
-4. Deploy. Every cold start begins with an empty database (Admin login still works, since Admin credentials come from environment variables, not the database) — you'll need to recreate employees after any cold start that lost the previous `/tmp` state.
-5. To actually keep data, swap `SQLALCHEMY_DATABASE_URI` for a hosted Postgres database (e.g. Neon or Supabase, both free-tier) and swap the local upload folders for object storage (e.g. Vercel Blob or S3) — ask if you want this done.
+3. Under **Project Settings → Environment Variables**, add every variable from `.env.example` — **each one needs an actual value typed in, not just the name left blank** (a blank `SECRET_KEY` crashes the app on the first request; a blank numeric setting crashes it at boot). At minimum: `SECRET_KEY` (generate with `python -c "import secrets; print(secrets.token_hex(32))"`), `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `COMPANY_UPI_ID`, `COMPANY_NAME`. Vercel does not read your local `.env` file — these must be entered in the dashboard.
+4. Also set `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_NAME`, and `SUPER_ADMIN_PASSWORD`. Because Vercel's database doesn't persist, a fresh cold start otherwise has *no* admin accounts beyond the shared bootstrap login above — these three guarantee one full (email+password, super-admin) account is automatically recreated every time the app boots, so you always have a reliable way in.
+5. Deploy. Every cold start begins with an empty database aside from that seeded super admin — you'll need to recreate employees after any cold start that lost the previous `/tmp` state.
+6. To actually keep data, swap `SQLALCHEMY_DATABASE_URI` for a hosted Postgres database (e.g. Neon or Supabase, both free-tier) and swap the local upload folders for object storage (e.g. Vercel Blob or S3) — ask if you want this done.
 
 ## Maintenance
 

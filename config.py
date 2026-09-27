@@ -91,3 +91,15 @@ class Config:
     SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "True") == "True"
     MAIL_FROM_ADDRESS = os.environ.get("MAIL_FROM_ADDRESS", "")
     MAIL_FROM_NAME = _str_env("MAIL_FROM_NAME", "Final Mile Techies Expense Tracker")
+
+    # Optional: guarantees one working AdminUser (email+password login,
+    # is_super_admin=True) exists on every boot -- see _seed_super_admin in
+    # app.py. Blank SUPER_ADMIN_EMAIL skips seeding entirely (the default,
+    # so local dev with the bootstrap ADMIN_USERNAME/ADMIN_PASSWORD login
+    # isn't affected). This is what makes "reset access" actually mean
+    # something on Vercel, where the database itself doesn't persist
+    # between cold starts -- without this, a fresh cold start has no
+    # admin accounts at all except the bootstrap one.
+    SUPER_ADMIN_EMAIL = os.environ.get("SUPER_ADMIN_EMAIL", "").strip()
+    SUPER_ADMIN_NAME = _str_env("SUPER_ADMIN_NAME", "Super Admin")
+    SUPER_ADMIN_PASSWORD = os.environ.get("SUPER_ADMIN_PASSWORD", "")
