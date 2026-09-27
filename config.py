@@ -8,12 +8,21 @@ load_dotenv()
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 
+def _str_env(name, default):
+    """os.environ.get(name, default) only falls back to `default` when the
+    key is absent, not when a dashboard (Vercel, Render, etc.) has it
+    present but left blank -- which silently produces "" instead of the
+    intended default. That's a crash later for SECRET_KEY specifically
+    (Flask refuses to touch the session with an empty secret key) and
+    silently wrong behavior for the rest. Treat blank the same as unset
+    for every setting that has a real default; leave truly optional
+    settings (SMTP_HOST, SMTP_USERNAME, ...) on plain os.environ.get,
+    since "" is already their correct/intended unset value."""
+    value = os.environ.get(name, "").strip()
+    return value if value else default
+
+
 def _int_env(name, default):
-    """int(os.environ.get(name, default)) crashes the whole app at import
-    time if the variable is set but left blank in a dashboard (Vercel,
-    Render, etc. all allow this) -- os.environ.get only falls back to
-    `default` when the key is absent, not when its value is "". Treat
-    blank the same as unset instead."""
     value = os.environ.get(name, "").strip()
     return int(value) if value else default
 
@@ -28,13 +37,13 @@ _UPLOAD_BASE = "/tmp/uploads" if IS_VERCEL else os.path.join(BASE_DIR, "uploads"
 
 
 class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-insecure-secret-key")
+    SECRET_KEY = _str_env("SECRET_KEY", "dev-insecure-secret-key")
 
-    ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
-    ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
+    ADMIN_USERNAME = _str_env("ADMIN_USERNAME", "admin")
+    ADMIN_PASSWORD = _str_env("ADMIN_PASSWORD", "admin")
 
-    COMPANY_NAME = os.environ.get("COMPANY_NAME", "Final Mile Techies")
-    COMPANY_UPI_ID = os.environ.get("COMPANY_UPI_ID", "company@upi")
+    COMPANY_NAME = _str_env("COMPANY_NAME", "Final Mile Techies")
+    COMPANY_UPI_ID = _str_env("COMPANY_UPI_ID", "company@upi")
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
@@ -81,4 +90,4 @@ class Config:
     SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
     SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "True") == "True"
     MAIL_FROM_ADDRESS = os.environ.get("MAIL_FROM_ADDRESS", "")
-    MAIL_FROM_NAME = os.environ.get("MAIL_FROM_NAME", "Final Mile Techies Expense Tracker")
+    MAIL_FROM_NAME = _str_env("MAIL_FROM_NAME", "Final Mile Techies Expense Tracker")
