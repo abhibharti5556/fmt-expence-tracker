@@ -6,7 +6,8 @@ from flask import (
     current_app, send_from_directory,
 )
 
-from models import User, AdminUser
+from extensions import db
+from models import User, AdminUser, STATUS_ACTIVE
 from utils.decorators import login_required
 from utils.helpers import delete_uploaded_file
 from utils.rate_limit import is_locked_out, record_failure, record_success
@@ -52,7 +53,69 @@ def login_select():
         return redirect(url_for("admin.dashboard"))
     if session.get("role") == "EMPLOYEE":
         return redirect(url_for("employee.dashboard"))
+    if AdminUser.query.first() is None:
+        return redirect(url_for("auth.setup"))
     return render_template("auth/login_select.html")
+
+
+@auth_bp.route("/setup", methods=["GET", "POST"])
+def setup():
+    """First-run only: creates the first AdminUser (as a super admin) when
+    none exist yet. Permanently locks itself out the moment one is
+    created -- this must never be reachable again afterward, or anyone
+    who finds the URL on a live site could mint themselves a super admin
+    account.
+
+    Exists specifically so getting a working admin login doesn't depend
+    on correctly configuring SUPER_ADMIN_EMAIL/PASSWORD env vars on a
+    dashboard (Vercel, etc.) beforehand -- this works from a bare
+    deployment with no environment setup at all."""
+    if AdminUser.query.first() is not None:
+        flash("Setup has already been completed. Please log in.", "info")
+        return redirect(url_for("auth.login_select"))
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        errors = []
+        if not name:
+            errors.append("Name is required.")
+        if not email or "@" not in email:
+            errors.append("Enter a valid email address.")
+        if len(password) < 8:
+            errors.append("Password must be at least 8 characters.")
+        if password != confirm_password:
+            errors.append("Passwords do not match.")
+
+        if errors:
+            for err in errors:
+                flash(err, "error")
+            return render_template("auth/setup.html", form=request.form)
+
+        # Re-check right before writing: closes the (very unlikely, but
+        # SQLite's BEGIN IMMEDIATE locking doesn't fully rule out) window
+        # where two people load this page before either has submitted.
+        if AdminUser.query.first() is not None:
+            flash("Setup has already been completed. Please log in.", "info")
+            return redirect(url_for("auth.login_select"))
+
+        admin = AdminUser(name=name, email=email, status=STATUS_ACTIVE, is_super_admin=True)
+        admin.set_password(password)
+        db.session.add(admin)
+        db.session.commit()
+
+        session.clear()
+        session.permanent = True
+        session["role"] = "ADMIN"
+        session["admin_id"] = admin.id
+        session["username"] = admin.name
+        flash(f"Welcome, {admin.name}! Your Super Admin account is ready.", "success")
+        return redirect(url_for("admin.dashboard"))
+
+    return render_template("auth/setup.html", form=None)
 
 
 @auth_bp.route("/login/admin", methods=["GET", "POST"])
@@ -61,6 +124,9 @@ def admin_login():
 
     if session.get("role") == "ADMIN":
         return redirect(next_url or url_for("admin.dashboard"))
+
+    if AdminUser.query.first() is None:
+        return redirect(url_for("auth.setup"))
 
     if request.method == "POST":
         email = request.form.get("email", "").strip()
